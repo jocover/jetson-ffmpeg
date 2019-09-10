@@ -10,7 +10,7 @@ L4T Multimedia API for ffmpeg
     cmake ..
     make
     sudo make install
-    
+	
 **2.patch ffmpeg and build**
 
     git clone git://source.ffmpeg.org/ffmpeg.git -b release/4.2 --depth=1
@@ -19,4 +19,9 @@ L4T Multimedia API for ffmpeg
     git apply ffmpeg_nvmpi.patch
     ./configure --enable-nvmpi
     make
+
+**3.using**
+
+    ffmpeg -c:v h264_nvmpi -i input_file -f null -
+	
 
