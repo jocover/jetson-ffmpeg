@@ -22,8 +22,7 @@ using namespace std;
 struct nvmpictx
 {
 	NvVideoDecoder *dec;
-	bool eos=false;
-	bool isready;
+	bool eos;
 	int index;
 	unsigned int coded_width;
 	unsigned int coded_height;
@@ -56,8 +55,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 	ctx->coded_width=crop.c.width;
 	ctx->coded_height=crop.c.height;
 
-	//printf("coded_width:%d\n",ctx->coded_width);
-
 	if(ctx->dst_dma_fd != -1)
 	{
 		NvBufferDestroy(ctx->dst_dma_fd);
@@ -76,7 +73,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
 	{
 		if (ctx->dmaBufferFileDescriptor[index] != 0)
-		{	//printf("dmaBufferFileDescriptor[index]:%d\n",ctx->dmaBufferFileDescriptor[index]);
+		{	
 			ret = NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
 			TEST_ERROR(ret < 0, "Failed to Destroy NvBuffer", ret);
 		}
@@ -92,7 +89,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 	ctx->numberCaptureBuffers = minimumDecoderCaptureBuffers + 5;
 
-	//printf("numberCaptureBuffers:%d\n",ctx->numberCaptureBuffers );
 
 
 	switch (format.fmt.pix_mp.colorspace)
@@ -101,50 +97,42 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12;
-				//LOG << "Decoder colorspace ITU-R BT.601 with standard range luma (16-235)";
+				// "Decoder colorspace ITU-R BT.601 with standard range luma (16-235)"
 				cParams.colorFormat = NvBufferColorFormat_NV12;
 			}
 			else
 			{
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12_ER;
-				//LOG << "Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
+				//"Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
 				cParams.colorFormat = NvBufferColorFormat_NV12_ER;
 			}
 			break;
 		case V4L2_COLORSPACE_REC709:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12_709;
-				//LOG << "Decoder colorspace ITU-R BT.709 with standard range luma (16-235)";
+				//"Decoder colorspace ITU-R BT.709 with standard range luma (16-235)";
 				cParams.colorFormat = NvBufferColorFormat_NV12_709;
 			}
 			else
 			{
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12_709_ER;
-				//LOG << "Decoder colorspace ITU-R BT.709 with extended range luma (0-255)";
+				//"Decoder colorspace ITU-R BT.709 with extended range luma (0-255)";
 				cParams.colorFormat = NvBufferColorFormat_NV12_709_ER;
 			}
 			break;
 		case V4L2_COLORSPACE_BT2020:
 			{
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12_2020;
-				//LOG << "Decoder colorspace ITU-R BT.2020";
+				//"Decoder colorspace ITU-R BT.2020";
 				cParams.colorFormat = NvBufferColorFormat_NV12_2020;
 			}
 			break;
 		default:
-			//LOG << "supported colorspace details not available, use default";
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12;
-				//LOG << "Decoder colorspace ITU-R BT.601 with standard range luma (16-235)";
+				//"Decoder colorspace ITU-R BT.601 with standard range luma (16-235)";
 				cParams.colorFormat = NvBufferColorFormat_NV12;
 			}
 			else
 			{
-				//cParams.colorFormat=NVBUF_COLOR_FORMAT_NV12_ER;
-				//LOG << "Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
+				//"Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
 				cParams.colorFormat = NvBufferColorFormat_NV12_ER;
 			}
 			break;
@@ -192,7 +180,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 		TEST_ERROR(ret < 0, "Error Qing buffer at output plane", ret);
 	}
 
-	printf("respondToResolutionEvent done\n");
 
 }
 
@@ -364,7 +351,6 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->dst_dma_fd=-1;
 	ctx->eos=false;
 	ctx->index=0;
-	ctx->isready=false;
 	ctx->frame_size[0]=0;
 	ctx->frame_pools=new std::queue<int>;
 
@@ -419,7 +405,6 @@ int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 	//v4l2_buf.timestamp.tv_sec = packet->pts /1000000;
 	v4l2_buf.timestamp.tv_usec = packet->pts;// - (v4l2_buf.timestamp.tv_sec * (time_t)1000000);
 
-	//printf("pts:%u sec:%u usec:%u\n",packet->pts,v4l2_buf.timestamp.tv_sec,v4l2_buf.timestamp.tv_usec);
 
 
 	ret = ctx->dec->output_plane.qBuffer(v4l2_buf, NULL);
