@@ -1,0 +1,244 @@
+diff --git a/configure b/configure
+index 34c2adb..7ae9ea2 100755
+--- a/configure
++++ b/configure
+@@ -340,6 +340,7 @@ External library support:
+   --disable-vaapi          disable Video Acceleration API (mainly Unix/Intel) code [autodetect]
+   --disable-vdpau          disable Nvidia Video Decode and Presentation API for Unix code [autodetect]
+   --disable-videotoolbox   disable VideoToolbox code [autodetect]
++  --enable-nvmpi           enable nvmpi decoder
+ 
+ Toolchain options:
+   --arch=ARCH              select architecture [$arch]
+@@ -1831,6 +1832,7 @@ HWACCEL_AUTODETECT_LIBRARY_LIST="
+     videotoolbox
+     v4l2_m2m
+     xvmc
++    nvmpi
+ "
+ 
+ # catchall list of things that require external libs to link
+@@ -3019,6 +3021,8 @@ h264_qsv_decoder_select="h264_mp4toannexb_bsf h264_parser qsvdec"
+ h264_qsv_encoder_select="qsvenc"
+ h264_rkmpp_decoder_deps="rkmpp"
+ h264_rkmpp_decoder_select="h264_mp4toannexb_bsf"
++h264_nvmpi_decoder_deps="nvmpi"
++h264_nvmpi_decoder_select="h264_mp4toannexb_bsf"
+ h264_vaapi_encoder_select="cbs_h264 vaapi_encode"
+ h264_v4l2m2m_decoder_deps="v4l2_m2m h264_v4l2_m2m"
+ h264_v4l2m2m_decoder_select="h264_mp4toannexb_bsf"
+@@ -3033,6 +3037,8 @@ hevc_qsv_decoder_select="hevc_mp4toannexb_bsf hevc_parser qsvdec"
+ hevc_qsv_encoder_select="hevcparse qsvenc"
+ hevc_rkmpp_decoder_deps="rkmpp"
+ hevc_rkmpp_decoder_select="hevc_mp4toannexb_bsf"
++hevc_nvmpi_decoder_deps="nvmpi"
++hevc_nvmpi_decoder_select="hevc_mp4toannexb_bsf"
+ hevc_vaapi_encoder_deps="VAEncPictureParameterBufferHEVC"
+ hevc_vaapi_encoder_select="cbs_h265 vaapi_encode"
+ hevc_v4l2m2m_decoder_deps="v4l2_m2m hevc_v4l2_m2m"
+@@ -6366,6 +6372,7 @@ enabled rkmpp             && { require_pkg_config rkmpp rockchip_mpp  rockchip/r
+                                  die "ERROR: rkmpp requires --enable-libdrm"; }
+                              }
+ enabled vapoursynth       && require_pkg_config vapoursynth "vapoursynth-script >= 42" VSScript.h vsscript_init
++enabled nvmpi		  && require_pkg_config nvmpi nvmpi nvmpi.h nvmpi_create_decoder
+ 
+ 
+ if enabled gcrypt; then
+diff --git a/libavcodec/Makefile b/libavcodec/Makefile
+index 3cd73fb..e45efe0 100644
+--- a/libavcodec/Makefile
++++ b/libavcodec/Makefile
+@@ -354,6 +354,7 @@ OBJS-$(CONFIG_H264_MMAL_DECODER)       += mmaldec.o
+ OBJS-$(CONFIG_H264_NVENC_ENCODER)      += nvenc_h264.o
+ OBJS-$(CONFIG_NVENC_ENCODER)           += nvenc_h264.o
+ OBJS-$(CONFIG_NVENC_H264_ENCODER)      += nvenc_h264.o
++OBJS-$(CONFIG_H264_NVMPI_DECODER)      += nvmpi.o
+ OBJS-$(CONFIG_H264_OMX_ENCODER)        += omx.o
+ OBJS-$(CONFIG_H264_QSV_DECODER)        += qsvdec_h2645.o
+ OBJS-$(CONFIG_H264_QSV_ENCODER)        += qsvenc_h264.o
+@@ -379,6 +380,7 @@ OBJS-$(CONFIG_HEVC_QSV_ENCODER)        += qsvenc_hevc.o hevc_ps_enc.o       \
+ OBJS-$(CONFIG_HEVC_RKMPP_DECODER)      += rkmppdec.o
+ OBJS-$(CONFIG_HEVC_VAAPI_ENCODER)      += vaapi_encode_h265.o h265_profile_level.o
+ OBJS-$(CONFIG_HEVC_V4L2M2M_DECODER)    += v4l2_m2m_dec.o
++OBJS-$(CONFIG_HEVC_NVMPI_DECODER)      += nvmpi.o
+ OBJS-$(CONFIG_HEVC_V4L2M2M_ENCODER)    += v4l2_m2m_enc.o
+ OBJS-$(CONFIG_HNM4_VIDEO_DECODER)      += hnm4video.o
+ OBJS-$(CONFIG_HQ_HQA_DECODER)          += hq_hqa.o hq_hqadata.o hq_hqadsp.o \
+diff --git a/libavcodec/allcodecs.c b/libavcodec/allcodecs.c
+index d2f9a39..e22bca0 100644
+--- a/libavcodec/allcodecs.c
++++ b/libavcodec/allcodecs.c
+@@ -143,11 +143,13 @@ extern AVCodec ff_h264_mediacodec_decoder;
+ extern AVCodec ff_h264_mmal_decoder;
+ extern AVCodec ff_h264_qsv_decoder;
+ extern AVCodec ff_h264_rkmpp_decoder;
++extern AVCodec ff_h264_nvmpi_decoder;
+ extern AVCodec ff_hap_encoder;
+ extern AVCodec ff_hap_decoder;
+ extern AVCodec ff_hevc_decoder;
+ extern AVCodec ff_hevc_qsv_decoder;
+ extern AVCodec ff_hevc_rkmpp_decoder;
++extern AVCodec ff_hevc_nvmpi_decoder;
+ extern AVCodec ff_hevc_v4l2m2m_decoder;
+ extern AVCodec ff_hnm4_video_decoder;
+ extern AVCodec ff_hq_hqa_decoder;
+diff --git a/libavcodec/nvmpi.c b/libavcodec/nvmpi.c
+new file mode 100644
+index 0000000..681ec67
+--- /dev/null
++++ b/libavcodec/nvmpi.c
+@@ -0,0 +1,154 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <sys/time.h>
++
++#include <nvmpi.h>
++#include "avcodec.h"
++#include "decode.h"
++#include "internal.h"
++#include "libavutil/buffer.h"
++#include "libavutil/common.h"
++#include "libavutil/frame.h"
++#include "libavutil/hwcontext.h"
++#include "libavutil/hwcontext_drm.h"
++#include "libavutil/imgutils.h"
++#include "libavutil/log.h"
++
++
++
++
++typedef struct {
++	char eos_reached;
++	nvmpictx* ctx;
++	AVClass *av_class;
++} nvmpiDecodeContext;
++
++static nvCodingType nvmpi_get_codingtype(AVCodecContext *avctx)
++{
++	switch (avctx->codec_id) {
++		case AV_CODEC_ID_H264:          return NV_VIDEO_CodingH264;
++		case AV_CODEC_ID_HEVC:          return NV_VIDEO_CodingHEVC;
++		case AV_CODEC_ID_VP8:           return NV_VIDEO_CodingVP8;
++		case AV_CODEC_ID_VP9:           return NV_VIDEO_CodingVP9;
++		default:                        return NV_VIDEO_CodingUnused;
++	}
++};
++
++
++static int nvmpi_init_decoder(AVCodecContext *avctx){
++	int ret=0;	
++	nvmpiDecodeContext *nvmpi_context = avctx->priv_data;
++	nvCodingType codectype=NV_VIDEO_CodingUnused;
++
++	codectype =nvmpi_get_codingtype(avctx);
++	if (codectype == NV_VIDEO_CodingUnused) {
++		av_log(avctx, AV_LOG_ERROR, "Unknown codec type (%d).\n", avctx->codec_id);
++		ret = AVERROR_UNKNOWN;
++		return ret;
++	}
++
++	
++	nvmpi_context->ctx=nvmpi_create_decoder(codectype,NV_PIX_YUV420);
++	
++	if(ret!=0){
++		av_log(avctx, AV_LOG_ERROR, "Failed to nvmpi_create_decoder (code = %d).\n", ret);
++		ret = AVERROR_UNKNOWN;
++		return ret;
++	}
++
++	return ret;
++}
++
++
++
++static int nvmpi_close(AVCodecContext *avctx){
++
++	nvmpiDecodeContext *nvmpi_context = avctx->priv_data;
++	return nvmpi_decoder_close(nvmpi_context->ctx);
++
++}
++
++
++
++static int nvmpi_decode(AVCodecContext *avctx,void *data,int *got_frame, AVPacket *avpkt){
++
++
++	nvmpiDecodeContext *nvmpi_context = avctx->priv_data;
++	AVFrame *frame = data;
++	nvFrame _nvframe={0};
++	nvPacket packet;
++	uint8_t* ptrs[3];
++	int res,linesize[3];
++
++	if(!avpkt->data)
++		return 0;
++
++	packet.payload_size=avpkt->size;
++	packet.payload=avpkt->data;
++	packet.pts=avpkt->pts;
++
++	res=nvmpi_decoder_put_packet(nvmpi_context->ctx,&packet);
++
++	res=nvmpi_decoder_get_frame(nvmpi_context->ctx,&_nvframe);
++	if(res<0)
++		return avpkt->size;
++
++	if (ff_get_buffer(avctx, frame, 0) < 0) {
++		return AVERROR(ENOMEM);
++	
++	}
++
++	linesize[0]=_nvframe.pitch[0];
++	linesize[1]=_nvframe.pitch[1];
++	linesize[2]=_nvframe.pitch[2];
++
++	ptrs[0]=_nvframe.payload[0];
++	ptrs[1]=_nvframe.payload[1];
++	ptrs[2]=_nvframe.payload[2];
++
++	 av_image_copy(frame->data, frame->linesize, (const uint8_t **) ptrs, linesize, avctx->pix_fmt, avctx->width, avctx->height);
++
++	frame->width=_nvframe.width;
++	frame->height=_nvframe.height;
++	//printf("frame->width:%d height%d\n",frame->width,frame->height);
++
++	frame->format=AV_PIX_FMT_YUV420P;
++	frame->pts=_nvframe.timestamp;
++	frame->pkt_dts = AV_NOPTS_VALUE;
++
++	*got_frame = 1;
++
++	return avpkt->size;
++}
++
++
++
++
++#define NVMPI_DEC_CLASS(NAME) \
++	static const AVClass nvmpi_##NAME##_dec_class = { \
++		.class_name = "nvmpi_" #NAME "_dec", \
++		.version    = LIBAVUTIL_VERSION_INT, \
++	};
++
++#define NVMPI_DEC(NAME, ID, BSFS) \
++	NVMPI_DEC_CLASS(NAME) \
++	AVCodec ff_##NAME##_nvmpi_decoder = { \
++		.name           = #NAME "_nvmpi", \
++		.long_name      = NULL_IF_CONFIG_SMALL(#NAME " (nvmpi)"), \
++		.type           = AVMEDIA_TYPE_VIDEO, \
++		.id             = ID, \
++		.priv_data_size = sizeof(nvmpiDecodeContext), \
++		.init           = nvmpi_init_decoder, \
++		.close          = nvmpi_close, \
++		.decode         = nvmpi_decode, \
++		.priv_class     = &nvmpi_##NAME##_dec_class, \
++		.capabilities   = AV_CODEC_CAP_DELAY | AV_CODEC_CAP_HARDWARE, \
++		.pix_fmts	=(const enum AVPixelFormat[]){ AV_PIX_FMT_NV12,AV_PIX_FMT_NONE},\
++		.bsfs           = BSFS, \
++		.wrapper_name   = "nvmpi", \
++	};
++
++
++
++NVMPI_DEC(h264,  AV_CODEC_ID_H264,"h264_mp4toannexb")
++NVMPI_DEC(hevc,  AV_CODEC_ID_HEVC,"hevc_mp4toannexb")
