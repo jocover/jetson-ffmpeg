@@ -84,10 +84,10 @@ index d2f9a39..e22bca0 100644
  extern AVCodec ff_hq_hqa_decoder;
 diff --git a/libavcodec/nvmpi.c b/libavcodec/nvmpi.c
 new file mode 100644
-index 0000000..9837ffd
+index 0000000..27b0922
 --- /dev/null
 +++ b/libavcodec/nvmpi.c
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,155 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <sys/time.h>
@@ -126,7 +126,9 @@ index 0000000..9837ffd
 +
 +
 +static int nvmpi_init_decoder(AVCodecContext *avctx){
-+	int ret=0;	
++
++	int ret=0;
++
 +	nvmpiDecodeContext *nvmpi_context = avctx->priv_data;
 +	nvCodingType codectype=NV_VIDEO_CodingUnused;
 +
@@ -137,9 +139,8 @@ index 0000000..9837ffd
 +		return ret;
 +	}
 +
-+	
 +	nvmpi_context->ctx=nvmpi_create_decoder(codectype,NV_PIX_YUV420);
-+	
++
 +	if(ret!=0){
 +		av_log(avctx, AV_LOG_ERROR, "Failed to nvmpi_create_decoder (code = %d).\n", ret);
 +		ret = AVERROR_UNKNOWN;
@@ -147,6 +148,7 @@ index 0000000..9837ffd
 +	}
 +
 +	return ret;
++
 +}
 +
 +
@@ -185,7 +187,7 @@ index 0000000..9837ffd
 +
 +	if (ff_get_buffer(avctx, frame, 0) < 0) {
 +		return AVERROR(ENOMEM);
-+	
++
 +	}
 +
 +	linesize[0]=_nvframe.linesize[0];
