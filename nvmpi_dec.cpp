@@ -6,6 +6,7 @@
 #include <iostream>
 #include <thread>
 #include <unistd.h>
+#include <queue>
 
 #define CHUNK_SIZE 4000000
 #define MAX_BUFFERS 32
@@ -22,7 +23,7 @@ struct nvmpictx
 {
 	NvVideoDecoder *dec;
 	bool eos=false;
-	int picture_index;
+	bool isready;
 	int index;
 	unsigned int coded_width;
 	unsigned int coded_height;
@@ -31,11 +32,12 @@ struct nvmpictx
 	int dmaBufferFileDescriptor[MAX_BUFFERS];
 	nvPixFormat out_pixfmt;
 	std::thread * dec_capture_loop;
+	std::queue<int> * frame_pools;
 	unsigned char * bufptr_0[MAX_BUFFERS];
 	unsigned char * bufptr_1[MAX_BUFFERS];
 	unsigned char * bufptr_2[MAX_BUFFERS];
-	unsigned int frame_size[3];
-	unsigned int frame_pitch[3];
+	unsigned int frame_size[MAX_NUM_PLANES];
+	unsigned int frame_linesize[MAX_NUM_PLANES];
 	unsigned long long timestamp[MAX_BUFFERS];
 };
 
@@ -192,8 +194,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 	printf("respondToResolutionEvent done\n");
 
-
-
 }
 
 void *dec_capture_loop_fcn(void *arg){
@@ -298,21 +298,23 @@ void *dec_capture_loop_fcn(void *arg){
 
 				}
 
+
 			}
 
-			ctx->frame_pitch[0]=parm.width[0];
-			ctx->frame_pitch[1]=parm.width[1];
-			ctx->frame_pitch[2]=parm.width[2];
-
+			ctx->frame_linesize[0]=parm.width[0];
 			ctx->frame_size[0]=parm.psize[0];
+
+			ctx->frame_linesize[1]=parm.width[1];
 			ctx->frame_size[1]=parm.psize[1];
+			ctx->frame_linesize[2]=parm.width[2];
 			ctx->frame_size[2]=parm.psize[2];
 
 			ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[v4l2_buf.index]);
 			ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[v4l2_buf.index]);	
-			ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[v4l2_buf.index]);	
+			if(ctx->out_pixfmt==NV_PIX_YUV420)
+				ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[v4l2_buf.index]);	
 
-			ctx->picture_index=v4l2_buf.index;
+			ctx->frame_pools->push(v4l2_buf.index);
 			ctx->timestamp[v4l2_buf.index]=v4l2_buf.timestamp.tv_usec;
 
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
@@ -362,8 +364,9 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->dst_dma_fd=-1;
 	ctx->eos=false;
 	ctx->index=0;
-	ctx->picture_index=-1;
+	ctx->isready=false;
 	ctx->frame_size[0]=0;
+	ctx->frame_pools=new std::queue<int>;
 
 	for(int index=0;index<MAX_BUFFERS;index++)
 		ctx->dmaBufferFileDescriptor[index]=0;
@@ -441,29 +444,30 @@ int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 
 int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
 
-	int ret;
+	int ret,picture_index;
 
-	if(ctx->picture_index<0)
+	if(ctx->frame_pools->empty()){
 		return -1;
+	}
+	picture_index=ctx->frame_pools->front();
+	ctx->frame_pools->pop();
 
 	frame->width=ctx->coded_width;
 	frame->height=ctx->coded_height;
 
 
-	frame->pitch[0]=ctx->frame_pitch[0];
-	frame->pitch[1]=ctx->frame_pitch[1];
-	frame->pitch[2]=ctx->frame_pitch[2];
+	frame->linesize[0]=ctx->frame_linesize[0];
+	frame->linesize[1]=ctx->frame_linesize[1];
+	frame->linesize[2]=ctx->frame_linesize[2];
 
-	frame->payload[0]=ctx->bufptr_0[ctx->picture_index];
-	frame->payload[1]=ctx->bufptr_1[ctx->picture_index];
-	frame->payload[2]=ctx->bufptr_2[ctx->picture_index];
+	frame->payload[0]=ctx->bufptr_0[picture_index];
+	frame->payload[1]=ctx->bufptr_1[picture_index];
+	frame->payload[2]=ctx->bufptr_2[picture_index];
 
 	frame->payload_size[0]=ctx->frame_size[0];
 	frame->payload_size[1]=ctx->frame_size[1];
 	frame->payload_size[2]=ctx->frame_size[2];
-	frame->timestamp=ctx->timestamp[ctx->picture_index];
-	ctx->picture_index=-1;
-
+	frame->timestamp=ctx->timestamp[picture_index];
 
 	return 0;
 
@@ -474,9 +478,7 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	// The decoder destructor does all the cleanup i.e set streamoff on output and capture planes,
 	// unmap buffers, tell decoder to deallocate buffer (reqbufs ioctl with counnt = 0),
 	// and finally call v4l2_close on the fd.
-
 	ctx->eos=true;
-	delete ctx->dec;
 
 	for(int index=0;index<ctx->numberCaptureBuffers;index++){
 		delete ctx->bufptr_0[index];
@@ -485,22 +487,14 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	}
 
-
+	delete ctx->dec;
 	if(ctx->dst_dma_fd != -1){
 		NvBufferDestroy(ctx->dst_dma_fd);
 		ctx->dst_dma_fd = -1;
 	}
-
 	free(ctx);
 
-
 	return 0;
 }
 
-int nvmpi_decoder_flush(nvmpictx* ctx){
-	printf("nvmpi_decoder_flush\n");
-
-
-	return 0;
-}
 

@@ -84,10 +84,10 @@ index d2f9a39..e22bca0 100644
  extern AVCodec ff_hq_hqa_decoder;
 diff --git a/libavcodec/nvmpi.c b/libavcodec/nvmpi.c
 new file mode 100644
-index 0000000..681ec67
+index 0000000..9837ffd
 --- /dev/null
 +++ b/libavcodec/nvmpi.c
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,153 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <sys/time.h>
@@ -162,7 +162,6 @@ index 0000000..681ec67
 +
 +static int nvmpi_decode(AVCodecContext *avctx,void *data,int *got_frame, AVPacket *avpkt){
 +
-+
 +	nvmpiDecodeContext *nvmpi_context = avctx->priv_data;
 +	AVFrame *frame = data;
 +	nvFrame _nvframe={0};
@@ -170,37 +169,37 @@ index 0000000..681ec67
 +	uint8_t* ptrs[3];
 +	int res,linesize[3];
 +
-+	if(!avpkt->data)
-+		return 0;
++	if(avpkt->size){
++		packet.payload_size=avpkt->size;
++		packet.payload=avpkt->data;
++		packet.pts=avpkt->pts;
 +
-+	packet.payload_size=avpkt->size;
-+	packet.payload=avpkt->data;
-+	packet.pts=avpkt->pts;
-+
-+	res=nvmpi_decoder_put_packet(nvmpi_context->ctx,&packet);
++		res=nvmpi_decoder_put_packet(nvmpi_context->ctx,&packet);
++	}
 +
 +	res=nvmpi_decoder_get_frame(nvmpi_context->ctx,&_nvframe);
++
 +	if(res<0)
 +		return avpkt->size;
++
 +
 +	if (ff_get_buffer(avctx, frame, 0) < 0) {
 +		return AVERROR(ENOMEM);
 +	
 +	}
 +
-+	linesize[0]=_nvframe.pitch[0];
-+	linesize[1]=_nvframe.pitch[1];
-+	linesize[2]=_nvframe.pitch[2];
++	linesize[0]=_nvframe.linesize[0];
++	linesize[1]=_nvframe.linesize[1];
++	linesize[2]=_nvframe.linesize[2];
 +
 +	ptrs[0]=_nvframe.payload[0];
 +	ptrs[1]=_nvframe.payload[1];
 +	ptrs[2]=_nvframe.payload[2];
 +
-+	 av_image_copy(frame->data, frame->linesize, (const uint8_t **) ptrs, linesize, avctx->pix_fmt, avctx->width, avctx->height);
++	av_image_copy(frame->data, frame->linesize, (const uint8_t **) ptrs, linesize, avctx->pix_fmt, _nvframe.width,_nvframe.height);
 +
 +	frame->width=_nvframe.width;
 +	frame->height=_nvframe.height;
-+	//printf("frame->width:%d height%d\n",frame->width,frame->height);
 +
 +	frame->format=AV_PIX_FMT_YUV420P;
 +	frame->pts=_nvframe.timestamp;
@@ -233,7 +232,7 @@ index 0000000..681ec67
 +		.decode         = nvmpi_decode, \
 +		.priv_class     = &nvmpi_##NAME##_dec_class, \
 +		.capabilities   = AV_CODEC_CAP_DELAY | AV_CODEC_CAP_HARDWARE, \
-+		.pix_fmts	=(const enum AVPixelFormat[]){ AV_PIX_FMT_NV12,AV_PIX_FMT_NONE},\
++		.pix_fmts	=(const enum AVPixelFormat[]){AV_PIX_FMT_YUV420P,AV_PIX_FMT_NV12,AV_PIX_FMT_NONE},\
 +		.bsfs           = BSFS, \
 +		.wrapper_name   = "nvmpi", \
 +	};

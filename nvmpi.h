@@ -20,7 +20,7 @@ typedef struct _NVFRAME{
 	unsigned long flags;
 	unsigned long payload_size[3];
 	unsigned char *payload[3];
-	unsigned int pitch[3];
+	unsigned int linesize[3];
 	nvPixFormat type;
 	unsigned int width;
 	unsigned int height;
@@ -50,8 +50,6 @@ extern "C" {
 	int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame);
 
 	int nvmpi_decoder_close(nvmpictx* ctx);
-
-	int nvmpi_decoder_flush(nvmpictx* ctx);
 
 #ifdef __cplusplus
 }
