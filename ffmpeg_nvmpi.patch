@@ -84,10 +84,10 @@ index d2f9a39..e22bca0 100644
  extern AVCodec ff_hq_hqa_decoder;
 diff --git a/libavcodec/nvmpi.c b/libavcodec/nvmpi.c
 new file mode 100644
-index 0000000..27b0922
+index 0000000..aa3ed2e
 --- /dev/null
 +++ b/libavcodec/nvmpi.c
-@@ -0,0 +1,155 @@
+@@ -0,0 +1,160 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <sys/time.h>
@@ -207,6 +207,11 @@ index 0000000..27b0922
 +	frame->pts=_nvframe.timestamp;
 +	frame->pkt_dts = AV_NOPTS_VALUE;
 +
++	avctx->coded_width=_nvframe.width;
++	avctx->coded_height=_nvframe.height;
++	avctx->width=_nvframe.width;
++	avctx->height=_nvframe.height;
++
 +	*got_frame = 1;
 +
 +	return avpkt->size;
@@ -233,7 +238,7 @@ index 0000000..27b0922
 +		.close          = nvmpi_close, \
 +		.decode         = nvmpi_decode, \
 +		.priv_class     = &nvmpi_##NAME##_dec_class, \
-+		.capabilities   = AV_CODEC_CAP_DELAY | AV_CODEC_CAP_HARDWARE, \
++		.capabilities   = AV_CODEC_CAP_DELAY | AV_CODEC_CAP_AVOID_PROBING | AV_CODEC_CAP_HARDWARE, \
 +		.pix_fmts	=(const enum AVPixelFormat[]){AV_PIX_FMT_YUV420P,AV_PIX_FMT_NV12,AV_PIX_FMT_NONE},\
 +		.bsfs           = BSFS, \
 +		.wrapper_name   = "nvmpi", \
