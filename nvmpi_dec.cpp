@@ -96,7 +96,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 		case V4L2_COLORSPACE_SMPTE170M:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
-
 				// "Decoder colorspace ITU-R BT.601 with standard range luma (16-235)"
 				cParams.colorFormat = NvBufferColorFormat_NV12;
 			}
@@ -179,8 +178,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 		ret = ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL);
 		TEST_ERROR(ret < 0, "Error Qing buffer at output plane", ret);
 	}
-
-
 }
 
 void *dec_capture_loop_fcn(void *arg){
@@ -259,57 +256,57 @@ void *dec_capture_loop_fcn(void *arg){
 			transform_params.transform_filter = NvBufferTransform_Filter_Smart;
 			transform_params.src_rect = src_rect;
 			transform_params.dst_rect = dest_rect;
+			if(!ctx->eos){
+				ret = NvBufferTransform(dec_buffer->planes[0].fd, ctx->dst_dma_fd, &transform_params);
+				TEST_ERROR(ret==-1, "Transform failed",ret);
 
-			ret = NvBufferTransform(dec_buffer->planes[0].fd, ctx->dst_dma_fd, &transform_params);
-			TEST_ERROR(ret==-1, "Transform failed",ret);
+				NvBufferParams parm;
+				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
 
-			NvBufferParams parm;
-			ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
+				/*
+				   printf("nv_buffer_size:%u\n",parm.nv_buffer_size);
+				   printf("pixel_format:%d\n",parm.pixel_format);
+				   printf("parm.pitch[0]:%u [1]:%u [2]:%u\n",parm.pitch[0],parm.pitch[1],parm.pitch[2]);
+				   printf("parm.offset[0]:%u [1]:%u [2]:%u\n",parm.offset[0],parm.offset[1],parm.offset[2]);
+				   printf("parm.width[0]:%u [1]:%u [2]:%u\n",parm.width[0],parm.width[1],parm.width[2]);
+				   printf("parm.height[0]:%u [1]:%u [2]:%u\n",parm.height[0],parm.height[1],parm.height[2]);
+				   printf("parm.psize[0]:%u [1]:%u [2]:%u\n",parm.psize[0],parm.psize[1],parm.psize[2]);
+				   printf("parm.layout[0]:%u [1]:%u [2]:%u\n",parm.layout[0],parm.layout[1],parm.layout[2]);
+				   printf("\n");
 
-			//			printf("nv_buffer_size:%u\n",parm.nv_buffer_size);
-			//			printf("pixel_format:%d\n",parm.pixel_format);
-			//			printf("parm.pitch[0]:%u [1]:%u [2]:%u\n",parm.pitch[0],parm.pitch[1],parm.pitch[2]);
-			//			printf("parm.offset[0]:%u [1]:%u [2]:%u\n",parm.offset[0],parm.offset[1],parm.offset[2]);
-			//			printf("parm.width[0]:%u [1]:%u [2]:%u\n",parm.width[0],parm.width[1],parm.width[2]);
-			//			printf("parm.height[0]:%u [1]:%u [2]:%u\n",parm.height[0],parm.height[1],parm.height[2]);
-			//			printf("parm.psize[0]:%u [1]:%u [2]:%u\n",parm.psize[0],parm.psize[1],parm.psize[2]);
-			//			printf("parm.layout[0]:%u [1]:%u [2]:%u\n",parm.layout[0],parm.layout[1],parm.layout[2]);
-			//			printf("\n");
+*/
 
-			if(!ctx->frame_size[0]){
+				if(!ctx->frame_size[0]){
 
-				for(int index=0;index<ctx->numberCaptureBuffers;index++){
-					ctx->bufptr_0[index]=new unsigned char[parm.psize[0]];//Y
-					ctx->bufptr_1[index]=new unsigned char[parm.psize[1]];//UV or UU
-					ctx->bufptr_2[index]=new unsigned char[parm.psize[2]];//VV
-
+					for(int index=0;index<ctx->numberCaptureBuffers;index++){
+						ctx->bufptr_0[index]=new unsigned char[parm.psize[0]];//Y
+						ctx->bufptr_1[index]=new unsigned char[parm.psize[1]];//UV or UU
+						ctx->bufptr_2[index]=new unsigned char[parm.psize[2]];//VV
+					}
 				}
 
 
+				ctx->frame_linesize[0]=parm.width[0];
+				ctx->frame_size[0]=parm.psize[0];
+
+				ctx->frame_linesize[1]=parm.width[1];
+				ctx->frame_size[1]=parm.psize[1];
+				ctx->frame_linesize[2]=parm.width[2];
+				ctx->frame_size[2]=parm.psize[2];
+
+				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[v4l2_buf.index]);
+				ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[v4l2_buf.index]);	
+				if(ctx->out_pixfmt==NV_PIX_YUV420)
+					ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[v4l2_buf.index]);	
+
+				ctx->frame_pools->push(v4l2_buf.index);
+				ctx->timestamp[v4l2_buf.index]=v4l2_buf.timestamp.tv_usec;
 			}
-
-			ctx->frame_linesize[0]=parm.width[0];
-			ctx->frame_size[0]=parm.psize[0];
-
-			ctx->frame_linesize[1]=parm.width[1];
-			ctx->frame_size[1]=parm.psize[1];
-			ctx->frame_linesize[2]=parm.width[2];
-			ctx->frame_size[2]=parm.psize[2];
-
-			ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[v4l2_buf.index]);
-			ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[v4l2_buf.index]);	
-			if(ctx->out_pixfmt==NV_PIX_YUV420)
-				ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[v4l2_buf.index]);	
-
-			ctx->frame_pools->push(v4l2_buf.index);
-			ctx->timestamp[v4l2_buf.index]=v4l2_buf.timestamp.tv_usec;
-
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
 				printf("Error while queueing buffer at decoder capture plane\n");
 
 			}
-
 
 		}
 
@@ -320,7 +317,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 
 	int ret;
 
-	nvmpictx* ctx=(nvmpictx*)malloc(sizeof(nvmpictx));
+	nvmpictx* ctx=new nvmpictx;
 
 	ctx->dec = NvVideoDecoder::createVideoDecoder("dec0");
 	TEST_ERROR(!ctx->dec, "Could not create decoder",ret);
@@ -367,7 +364,6 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 
 int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 	int ret;
-
 
 	struct v4l2_buffer v4l2_buf;
 	struct v4l2_plane planes[MAX_PLANES];
@@ -460,9 +456,6 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
 
 int nvmpi_decoder_close(nvmpictx* ctx){
 
-	// The decoder destructor does all the cleanup i.e set streamoff on output and capture planes,
-	// unmap buffers, tell decoder to deallocate buffer (reqbufs ioctl with counnt = 0),
-	// and finally call v4l2_close on the fd.
 	ctx->eos=true;
 
 	for(int index=0;index<ctx->numberCaptureBuffers;index++){
@@ -472,12 +465,14 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	}
 
-	delete ctx->dec;
 	if(ctx->dst_dma_fd != -1){
 		NvBufferDestroy(ctx->dst_dma_fd);
 		ctx->dst_dma_fd = -1;
 	}
-	free(ctx);
+
+	delete ctx->dec;
+	delete ctx->frame_pools;
+	delete ctx;
 
 	return 0;
 }
