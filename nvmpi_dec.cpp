@@ -186,7 +186,7 @@ void *dec_capture_loop_fcn(void *arg){
 	struct v4l2_format v4l2Format;
 	struct v4l2_crop v4l2Crop;
 	struct v4l2_event v4l2Event;
-	int ret;
+	int ret,buf_index=0;
 	do{
 		ret = ctx->dec->dqEvent(v4l2Event, 50000);
 		if (ret < 0){
@@ -278,7 +278,7 @@ void *dec_capture_loop_fcn(void *arg){
 
 				if(!ctx->frame_size[0]){
 
-					for(int index=0;index<ctx->numberCaptureBuffers;index++){
+					for(int index=0;index<MAX_BUFFERS;index++){
 						ctx->bufptr_0[index]=new unsigned char[parm.psize[0]];//Y
 						ctx->bufptr_1[index]=new unsigned char[parm.psize[1]];//UV or UU
 						ctx->bufptr_2[index]=new unsigned char[parm.psize[2]];//VV
@@ -294,13 +294,15 @@ void *dec_capture_loop_fcn(void *arg){
 				ctx->frame_linesize[2]=parm.width[2];
 				ctx->frame_size[2]=parm.psize[2];
 
-				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[v4l2_buf.index]);
-				ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[v4l2_buf.index]);	
+				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[buf_index]);
+				ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[buf_index]);	
 				if(ctx->out_pixfmt==NV_PIX_YUV420)
-					ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[v4l2_buf.index]);	
+					ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[buf_index]);	
 
-				ctx->frame_pools->push(v4l2_buf.index);
-				ctx->timestamp[v4l2_buf.index]=v4l2_buf.timestamp.tv_usec;
+				ctx->frame_pools->push(buf_index);
+				ctx->timestamp[buf_index]=v4l2_buf.timestamp.tv_usec;
+
+				buf_index=(buf_index+1)%MAX_BUFFERS;
 			}
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
