@@ -9,6 +9,20 @@ typedef enum {
 	NV_PIX_YUV420
 }nvPixFormat;
 
+typedef struct _NVENCPARAM{
+	unsigned int width;
+	unsigned int height;
+	unsigned int profile;
+	unsigned int bitrate;
+	unsigned int peak_bitrate;
+	char enableLossless;
+	char mode_vbr;
+	unsigned int iframe_interval;
+	unsigned int idr_interval;
+	unsigned int fps_n;
+	unsigned int fps_d;
+} nvEncParam;
+
 typedef struct _NVPACKET{
 	unsigned long flags;
 	unsigned long payload_size;
@@ -50,6 +64,14 @@ extern "C" {
 	int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame);
 
 	int nvmpi_decoder_close(nvmpictx* ctx);
+
+	nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param);
+		
+	int nvmpi_encoder_put_frame(nvmpictx* ctx,nvFrame* frame);
+
+	int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet);
+
+	int nvmpi_encoder_close(nvmpictx* ctx);
 
 #ifdef __cplusplus
 }

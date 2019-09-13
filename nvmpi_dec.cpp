@@ -230,7 +230,7 @@ void *dec_capture_loop_fcn(void *arg){
 				else
 				{
 
-					printf( "Error while calling dequeue at capture plane\n");
+					//printf( "Error while calling dequeue at capture plane\n");
 					ctx->eos=true;
 				}
 				break;
@@ -263,7 +263,7 @@ void *dec_capture_loop_fcn(void *arg){
 				NvBufferParams parm;
 				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
 
-				/*
+				
 				   printf("nv_buffer_size:%u\n",parm.nv_buffer_size);
 				   printf("pixel_format:%d\n",parm.pixel_format);
 				   printf("parm.pitch[0]:%u [1]:%u [2]:%u\n",parm.pitch[0],parm.pitch[1],parm.pitch[2]);
@@ -274,7 +274,7 @@ void *dec_capture_loop_fcn(void *arg){
 				   printf("parm.layout[0]:%u [1]:%u [2]:%u\n",parm.layout[0],parm.layout[1],parm.layout[2]);
 				   printf("\n");
 
-*/
+
 
 				if(!ctx->frame_size[0]){
 
@@ -460,11 +460,10 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	ctx->eos=true;
 
-	for(int index=0;index<ctx->numberCaptureBuffers;index++){
+	for(int index=0;index<MAX_BUFFERS;index++){
 		delete ctx->bufptr_0[index];
 		delete ctx->bufptr_1[index];
 		delete ctx->bufptr_2[index];
-
 	}
 
 	if(ctx->dst_dma_fd != -1){
