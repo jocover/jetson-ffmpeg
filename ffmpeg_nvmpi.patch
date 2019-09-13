@@ -265,10 +265,10 @@ index 0000000..aa3ed2e
 +NVMPI_DEC(hevc,  AV_CODEC_ID_HEVC,"hevc_mp4toannexb")
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..31f29f6
+index 0000000..6398b8e
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,133 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -299,7 +299,8 @@ index 0000000..31f29f6
 +	param.idr_interval=256;
 +	param.peak_bitrate=0;
 +	param.fps_n=avctx->framerate.num;
-+	param.fps_d=avctx->framerate.den;	
++	param.fps_d=avctx->framerate.den;
++
 +
 +	if(avctx->codec->id == AV_CODEC_ID_H264)
 +		nvmpi_context->ctx=nvmpi_create_encoder(NV_VIDEO_CodingH264,&param);
@@ -313,7 +314,7 @@ index 0000000..31f29f6
 +
 +
 +static int nvmpi_encode_frame(AVCodecContext *avctx, AVPacket *pkt,const AVFrame *frame, int *got_packet){
-+	
++
 +	nvmpiEncodeContext * nvmpi_context = avctx->priv_data;
 +	nvFrame _nvframe={0};
 +	nvPacket packet={0};
@@ -336,7 +337,7 @@ index 0000000..31f29f6
 +		_nvframe.timestamp=frame->pts;
 +
 +		res=nvmpi_encoder_put_frame(nvmpi_context->ctx,&_nvframe);
-+		
++
 +		if(res<0)
 +			return res;
 +	}
@@ -346,7 +347,8 @@ index 0000000..31f29f6
 +		return 0;
 +
 +
-+	ff_alloc_packet2(avctx,pkt,packet.payload_size,packet.payload_size);	
++	ff_alloc_packet2(avctx,pkt,packet.payload_size,packet.payload_size);
++
 +	memcpy(pkt->data,packet.payload,packet.payload_size);
 +	pkt->pts=packet.pts;
 +
@@ -360,7 +362,8 @@ index 0000000..31f29f6
 +static av_cold int nvmpi_encode_close(AVCodecContext *avctx){
 +
 +	nvmpiEncodeContext *nvmpi_context = avctx->priv_data;
-+	nvmpi_encoder_close(nvmpi_context->ctx);	
++	nvmpi_encoder_close(nvmpi_context->ctx);
++
 +	return 0;
 +}
 +

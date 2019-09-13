@@ -68,7 +68,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 
 	if(ctx->packets_buf_size<buffer->planes[0].bytesused){
 		printf("ctx->packets_buf_size:%d buffer->planes[0].bytesused:%d\n",ctx->packets_buf_size,buffer->planes[0].bytesused);
-	
+
 	}
 
 	ctx->packets_size[ctx->buf_index]=buffer->planes[0].bytesused;
@@ -90,7 +90,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 }
 
 
-nvmpictx*  nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
+nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 
 	int ret;
 	nvmpictx *ctx=new nvmpictx;
@@ -151,7 +151,6 @@ nvmpictx*  nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	}
 	else
 		ret = ctx->enc->setOutputPlaneFormat(ctx->raw_pixfmt, ctx->width,ctx->height);
-	}
 
 
 	TEST_ERROR(ret < 0, "Could not set output plane format", ret);
@@ -310,7 +309,7 @@ int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet){
 }
 
 int nvmpi_encoder_close(nvmpictx* ctx){
-	
+
 	ctx->eos=true;
 	delete ctx->enc;
 	delete ctx->packet_pools;

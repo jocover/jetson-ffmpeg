@@ -16,6 +16,7 @@ find_package (Threads)
 
 add_library(nvmpi SHARED
     nvmpi_dec.cpp
+    nvmpi_enc.cpp
     common/NvBuffer.cpp
     common/NvElement.cpp
     common/NvElementProfiler.cpp
