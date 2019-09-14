@@ -263,7 +263,7 @@ void *dec_capture_loop_fcn(void *arg){
 				NvBufferParams parm;
 				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
 
-				
+				/*
 				   printf("nv_buffer_size:%u\n",parm.nv_buffer_size);
 				   printf("pixel_format:%d\n",parm.pixel_format);
 				   printf("parm.pitch[0]:%u [1]:%u [2]:%u\n",parm.pitch[0],parm.pitch[1],parm.pitch[2]);
@@ -273,7 +273,7 @@ void *dec_capture_loop_fcn(void *arg){
 				   printf("parm.psize[0]:%u [1]:%u [2]:%u\n",parm.psize[0],parm.psize[1],parm.psize[2]);
 				   printf("parm.layout[0]:%u [1]:%u [2]:%u\n",parm.layout[0],parm.layout[1],parm.layout[2]);
 				   printf("\n");
-
+				*/
 
 
 				if(!ctx->frame_size[0]){

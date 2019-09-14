@@ -22,6 +22,11 @@ L4T Multimedia API for ffmpeg
 
 **3.using**
 
-    ffmpeg -c:v h264_nvmpi -i input_file -f null -
-	
+Decode :	
 
+    ffmpeg -c:v h264_nvmpi -i input_file -f null -
+    ffmpeg -c:v hevc_nvmpi -i input_file -f null -
+Encode :
+
+    ffmpeg -i input_file -c:v h264_nvmpi <output.mp4>
+    ffmpeg -i input_file -c:v hevc_nvmpi <output.mp4>
