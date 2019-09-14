@@ -39,7 +39,6 @@ struct nvmpictx{
 	uint32_t fps_d;
 	bool enable_extended_colorformat;
 
-	bool eos;
 	uint32_t packets_buf_size;
 	unsigned char * packets[MAX_BUFFERS];
 	uint32_t packets_size[MAX_BUFFERS];
@@ -66,9 +65,14 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 		return false;
 	}
 
-	if(ctx->packets_buf_size<buffer->planes[0].bytesused){
-		printf("ctx->packets_buf_size:%d buffer->planes[0].bytesused:%d\n",ctx->packets_buf_size,buffer->planes[0].bytesused);
+	if(ctx->packets_buf_size < buffer->planes[0].bytesused){
 
+		ctx->packets_buf_size=buffer->planes[0].bytesused;
+
+		for(int index=0;index<MAX_BUFFERS;index++){
+			delete ctx->packets[index];
+			ctx->packets[index]=new unsigned char[ctx->packets_buf_size];	
+		}
 	}
 
 	ctx->packets_size[ctx->buf_index]=buffer->planes[0].bytesused;
@@ -109,7 +113,6 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ctx->packet_pools=new std::queue<int>;
 	ctx->buf_index=0;
 	ctx->enable_extended_colorformat=false;
-	ctx->eos=false;
 
 	if(param->enableLossless)
 		ctx->enableLossless=true;
@@ -252,7 +255,7 @@ int nvmpi_encoder_put_frame(nvmpictx* ctx,nvFrame* frame){
 
 	v4l2_buf.m.planes = planes;
 
-	if(ctx->enc->isInError()||ctx->eos)
+	if(ctx->enc->isInError())
 		return -1;
 
 	if(ctx->index < ctx->enc->output_plane.getNumBuffers()){
@@ -310,7 +313,8 @@ int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet){
 
 int nvmpi_encoder_close(nvmpictx* ctx){
 
-	ctx->eos=true;
+	ctx->enc->capture_plane.stopDQThread();
+	ctx->enc->capture_plane.waitForDQThread(1000);
 	delete ctx->enc;
 	delete ctx->packet_pools;
 	delete ctx;
