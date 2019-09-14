@@ -42,6 +42,7 @@ struct nvmpictx{
 	uint32_t packets_num;
 	unsigned char * packets[MAX_BUFFERS];
 	uint32_t packets_size[MAX_BUFFERS];
+	bool packets_keyflag[MAX_BUFFERS];
 	uint64_t timestamp[MAX_BUFFERS];
 	int buf_index;
 };
@@ -82,6 +83,14 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 
 	ctx->packet_pools->push(ctx->buf_index);
 
+	v4l2_ctrl_videoenc_outputbuf_metadata enc_metadata;
+	ctx->enc->getMetadata(v4l2_buf->index, enc_metadata);
+	if(enc_metadata.KeyFrame){
+		ctx->packets_keyflag[ctx->buf_index]=true;
+	}else{
+		ctx->packets_keyflag[ctx->buf_index]=false;
+	}
+		
 	ctx->buf_index=(ctx->buf_index+1)%ctx->packets_num;	
 
 	if (ctx->enc->capture_plane.qBuffer(*v4l2_buf, NULL) < 0)
@@ -374,6 +383,8 @@ int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet){
 	packet->payload=ctx->packets[packet_index];
 	packet->pts=ctx->timestamp[packet_index];
 	packet->payload_size=ctx->packets_size[packet_index];
+	if(ctx->packets_keyflag[packet_index])
+		packet->flags|= 0x0001;//AV_PKT_FLAG_KEY 0x0001
 
 	return 0;
 }

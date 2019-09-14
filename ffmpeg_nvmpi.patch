@@ -265,7 +265,7 @@ index 0000000..aa3ed2e
 +NVMPI_DEC(hevc,  AV_CODEC_ID_HEVC,"hevc_mp4toannexb")
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..954854e
+index 0000000..86492fe
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
 @@ -0,0 +1,168 @@
@@ -357,10 +357,10 @@ index 0000000..954854e
 +
 +	memcpy(pkt->data,packet.payload,packet.payload_size);
 +	pkt->pts=packet.pts;
++	if(packet.flags& AV_PKT_FLAG_KEY)
++		pkt->flags = AV_PKT_FLAG_KEY;
 +
 +	*got_packet = 1;
-+
-+	pkt->flags |= AV_PKT_FLAG_KEY;
 +
 +	return 0;
 +}
