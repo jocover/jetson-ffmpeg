@@ -265,10 +265,10 @@ index 0000000..aa3ed2e
 +NVMPI_DEC(hevc,  AV_CODEC_ID_HEVC,"hevc_mp4toannexb")
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..6398b8e
+index 0000000..954854e
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,168 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -284,6 +284,9 @@ index 0000000..6398b8e
 +typedef struct {
 +	const AVClass *class;
 +	nvmpictx* ctx;
++	int num_capture_buffers;
++	int profile;
++	int level;
 +}nvmpiEncodeContext;
 +
 +static av_cold int nvmpi_encode_init(AVCodecContext *avctx){
@@ -297,10 +300,13 @@ index 0000000..6398b8e
 +	param.bitrate=avctx->bit_rate;
 +	param.mode_vbr=0;
 +	param.idr_interval=256;
++	param.iframe_interval=30;
 +	param.peak_bitrate=0;
 +	param.fps_n=avctx->framerate.num;
 +	param.fps_d=avctx->framerate.den;
-+
++	param.profile=nvmpi_context->profile& ~FF_PROFILE_H264_INTRA;
++	param.level=nvmpi_context->level;
++	param.capture_num=nvmpi_context->num_capture_buffers;
 +
 +	if(avctx->codec->id == AV_CODEC_ID_H264)
 +		nvmpi_context->ctx=nvmpi_create_encoder(NV_VIDEO_CodingH264,&param);
@@ -367,10 +373,39 @@ index 0000000..6398b8e
 +	return 0;
 +}
 +
-+
++#define OFFSET(x) offsetof(nvmpiEncodeContext, x)
++#define VE AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_ENCODING_PARAM
 +
 +static const AVOption options[] = {
-+	{ NULL },
++	{ "num_capture_buffers", "Number of buffers in the capture context", OFFSET(num_capture_buffers), AV_OPT_TYPE_INT, {.i64 = 10 }, 10, INT_MAX, AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_ENCODING_PARAM },
++	/// Profile,
++
++	{ "profile",  "Set the encoding profile", OFFSET(profile), AV_OPT_TYPE_INT,   { .i64 = FF_PROFILE_UNKNOWN },       FF_PROFILE_UNKNOWN, FF_PROFILE_H264_HIGH, VE, "profile" },
++	{ "baseline", "",                         0,               AV_OPT_TYPE_CONST, { .i64 = FF_PROFILE_H264_BASELINE }, 0, 0, VE, "profile" },
++	{ "main",     "",                         0,               AV_OPT_TYPE_CONST, { .i64 = FF_PROFILE_H264_MAIN },     0, 0, VE, "profile" },
++	{ "high",     "",                         0,               AV_OPT_TYPE_CONST, { .i64 = FF_PROFILE_H264_HIGH },     0, 0, VE, "profile" },
++
++	/// Profile Level
++	{ "level",          "Profile Level",        OFFSET(level),  AV_OPT_TYPE_INT,   { .i64 = 0  }, 0, 62, VE, "level" },
++	{ "auto",           "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 0  }, 0, 0,  VE, "level" },
++	{ "1.0",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 10 }, 0, 0,  VE, "level" },
++	{ "1.1",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 11 }, 0, 0,  VE, "level" },
++	{ "1.2",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 12 }, 0, 0,  VE, "level" },
++	{ "1.3",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 13 }, 0, 0,  VE, "level" },
++	{ "2.0",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 20 }, 0, 0,  VE, "level" },
++	{ "2.1",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 21 }, 0, 0,  VE, "level" },
++	{ "2.2",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 22 }, 0, 0,  VE, "level" },
++	{ "3.0",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 30 }, 0, 0,  VE, "level" },
++	{ "3.1",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 31 }, 0, 0,  VE, "level" },
++	{ "3.2",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 32 }, 0, 0,  VE, "level" },
++	{ "4.0",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 40 }, 0, 0,  VE, "level" },
++	{ "4.1",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 41 }, 0, 0,  VE, "level" },
++	{ "4.2",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 42 }, 0, 0,  VE, "level" },
++	{ "5.0",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 50 }, 0, 0,  VE, "level" },
++	{ "5.1",            "",                     0,              AV_OPT_TYPE_CONST, { .i64 = 51 }, 0, 0,  VE, "level" },
++
++
++	{ NULL }
 +};
 +
 +

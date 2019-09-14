@@ -13,6 +13,7 @@ typedef struct _NVENCPARAM{
 	unsigned int width;
 	unsigned int height;
 	unsigned int profile;
+	unsigned int level;
 	unsigned int bitrate;
 	unsigned int peak_bitrate;
 	char enableLossless;
@@ -21,6 +22,7 @@ typedef struct _NVENCPARAM{
 	unsigned int idr_interval;
 	unsigned int fps_n;
 	unsigned int fps_d;
+	int capture_num;
 } nvEncParam;
 
 typedef struct _NVPACKET{

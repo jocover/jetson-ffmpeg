@@ -9,7 +9,6 @@
 
 #define CHUNK_SIZE 2*1024*1024
 #define MAX_BUFFERS 32
-
 #define TEST_ERROR(condition, message, errorCode)    \
 	if (condition)                               \
 {                                                    \
@@ -40,6 +39,7 @@ struct nvmpictx{
 	bool enable_extended_colorformat;
 
 	uint32_t packets_buf_size;
+	uint32_t packets_num;
 	unsigned char * packets[MAX_BUFFERS];
 	uint32_t packets_size[MAX_BUFFERS];
 	uint64_t timestamp[MAX_BUFFERS];
@@ -69,7 +69,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 
 		ctx->packets_buf_size=buffer->planes[0].bytesused;
 
-		for(int index=0;index<MAX_BUFFERS;index++){
+		for(int index=0;index< ctx->packets_num;index++){
 			delete ctx->packets[index];
 			ctx->packets[index]=new unsigned char[ctx->packets_buf_size];	
 		}
@@ -82,7 +82,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 
 	ctx->packet_pools->push(ctx->buf_index);
 
-	ctx->buf_index=(ctx->buf_index+1)%MAX_BUFFERS;	
+	ctx->buf_index=(ctx->buf_index+1)%ctx->packets_num;	
 
 	if (ctx->enc->capture_plane.qBuffer(*v4l2_buf, NULL) < 0)
 	{
@@ -101,11 +101,9 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ctx->index=0;
 	ctx->width=param->width;
 	ctx->height=param->height;
-	ctx->profile=V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE;
 	ctx->enableLossless=false;
 	ctx->bitrate=param->bitrate;
 	ctx->ratecontrol = V4L2_MPEG_VIDEO_BITRATE_MODE_CBR;	
-	ctx->level = V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
 	ctx->idr_interval = param->idr_interval;
 	ctx->fps_n = param->fps_n;
 	ctx->fps_d = param->fps_d;
@@ -113,6 +111,75 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ctx->packet_pools=new std::queue<int>;
 	ctx->buf_index=0;
 	ctx->enable_extended_colorformat=false;
+	ctx->packets_num=param->capture_num;
+
+	switch(param->profile){
+		case 77://FF_PROFILE_H264_MAIN
+			ctx->profile=V4L2_MPEG_VIDEO_H264_PROFILE_MAIN;
+			break;
+		case 66://FF_PROFILE_H264_BASELINE
+			ctx->profile=V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE;
+			break;
+		case 100://FF_PROFILE_H264_HIGH
+			ctx->profile=V4L2_MPEG_VIDEO_H264_PROFILE_HIGH;
+			break;
+
+		default:
+			ctx->profile=V4L2_MPEG_VIDEO_H264_PROFILE_MAIN;
+			break;
+
+	}
+
+	switch(param->level){
+	case 10:
+		ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_0;
+		break;
+	case 11:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_1;
+                break;
+	case 12:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_2;
+                break;
+	case 13:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_3;
+                break;
+	case 20:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_0;
+                break;
+	case 21:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_1;
+                break;
+	case 22:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_2;
+                break;
+	case 30:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_0;
+                break;
+	case 31:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_1;
+                break;
+	case 32:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_2;
+                break;
+	case 40:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_0;
+                break;
+	case 41:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
+                break;
+	case 42:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_2;
+                break;
+	case 50:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_0;
+                break;
+	case 51:
+                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
+                break;
+	default:
+		ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
+		break;	
+	}
 
 	if(param->enableLossless)
 		ctx->enableLossless=true;
@@ -152,9 +219,9 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 		ctx->profile = V4L2_MPEG_VIDEO_H264_PROFILE_HIGH_444_PREDICTIVE;
 		ret = ctx->enc->setOutputPlaneFormat(V4L2_PIX_FMT_YUV444M, ctx->width,ctx->height);
 	}
-	else
+	else{
 		ret = ctx->enc->setOutputPlaneFormat(ctx->raw_pixfmt, ctx->width,ctx->height);
-
+	}
 
 	TEST_ERROR(ret < 0, "Could not set output plane format", ret);
 
