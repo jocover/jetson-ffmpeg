@@ -265,10 +265,10 @@ index 0000000..aa3ed2e
 +NVMPI_DEC(hevc,  AV_CODEC_ID_HEVC,"hevc_mp4toannexb")
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..12ad25f
+index 0000000..3facaea
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,220 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -301,7 +301,8 @@ index 0000000..12ad25f
 +	param.height=avctx->height;
 +	param.bitrate=avctx->bit_rate;
 +	param.mode_vbr=0;
-+	param.idr_interval=256;
++	param.idr_interval=60;
++	param.iframe_interval=30;
 +	param.peak_bitrate=0;
 +	param.fps_n=avctx->framerate.num;
 +	param.fps_d=avctx->framerate.den;
@@ -324,12 +325,12 @@ index 0000000..12ad25f
 +
 +	}
 +
-+	if(avctx->max_b_frames > 0){
++	if(avctx->max_b_frames > 0 && avctx->max_b_frames < 3){
 +		param.max_b_frames=avctx->max_b_frames;
 +	}
 +
 +	if(avctx->gop_size>0){
-+		param.iframe_interval=avctx->gop_size;
++		param.idr_interval=param.iframe_interval=avctx->gop_size;
 +
 +	}
 +
