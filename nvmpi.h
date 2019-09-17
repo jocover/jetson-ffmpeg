@@ -23,6 +23,11 @@ typedef struct _NVENCPARAM{
 	unsigned int fps_n;
 	unsigned int fps_d;
 	int capture_num;
+	unsigned int max_b_frames;
+	unsigned int refs;
+	unsigned int qmax;
+	unsigned int qmin;
+	unsigned int hw_preset_type;
 } nvEncParam;
 
 typedef struct _NVPACKET{

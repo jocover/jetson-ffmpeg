@@ -265,10 +265,10 @@ index 0000000..aa3ed2e
 +NVMPI_DEC(hevc,  AV_CODEC_ID_HEVC,"hevc_mp4toannexb")
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..150db35
+index 0000000..e98490e
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,215 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -288,6 +288,7 @@ index 0000000..150db35
 +	int profile;
 +	int level;
 +	int rc;
++	int preset;
 +}nvmpiEncodeContext;
 +
 +static av_cold int nvmpi_encode_init(AVCodecContext *avctx){
@@ -301,17 +302,33 @@ index 0000000..150db35
 +	param.bitrate=avctx->bit_rate;
 +	param.mode_vbr=0;
 +	param.idr_interval=256;
-+	param.iframe_interval=30;
++	param.iframe_interval=50;
 +	param.peak_bitrate=0;
 +	param.fps_n=avctx->framerate.num;
 +	param.fps_d=avctx->framerate.den;
 +	param.profile=nvmpi_context->profile& ~FF_PROFILE_H264_INTRA;
 +	param.level=nvmpi_context->level;
 +	param.capture_num=nvmpi_context->num_capture_buffers;
++	param.hw_preset_type=nvmpi_context->preset;
 +
 +	if(nvmpi_context->rc==1){
 +		param.mode_vbr=1;
 +	}
++
++	if(avctx->qmin >= 0 && avctx->qmax >= 0){
++		param.qmin=avctx->qmin;
++		param.qmax=avctx->qmax;
++	}
++
++	if (avctx->refs >= 0){
++		param.refs=avctx->refs;
++
++	}
++
++	if(avctx->max_b_frames > 0){
++		param.max_b_frames=avctx->max_b_frames;
++	}
++
 +
 +	if(avctx->codec->id == AV_CODEC_ID_H264)
 +		nvmpi_context->ctx=nvmpi_create_encoder(NV_VIDEO_CodingH264,&param);
@@ -361,7 +378,8 @@ index 0000000..150db35
 +	ff_alloc_packet2(avctx,pkt,packet.payload_size,packet.payload_size);
 +
 +	memcpy(pkt->data,packet.payload,packet.payload_size);
-+	pkt->pts=packet.pts;
++	pkt->dts=pkt->pts=packet.pts;
++
 +	if(packet.flags& AV_PKT_FLAG_KEY)
 +		pkt->flags = AV_PKT_FLAG_KEY;
 +
@@ -379,16 +397,16 @@ index 0000000..150db35
 +}
 +
 +static const AVCodecDefault defaults[] = {
-+    { "b", "2M" },
-+    { "qmin", "-1" },
-+    { "qmax", "-1" },
-+    { "qdiff", "-1" },
-+    { "qblur", "-1" },
-+    { "qcomp", "-1" },
-+    { "g", "250" },
-+    { "bf", "0" },
-+    { "refs", "0" },
-+    { NULL },
++	{ "b", "2M" },
++	{ "qmin", "-1" },
++	{ "qmax", "-1" },
++	{ "qdiff", "-1" },
++	{ "qblur", "-1" },
++	{ "qcomp", "-1" },
++	{ "g", "250" },
++	{ "bf", "0" },
++	{ "refs", "0" },
++	{ NULL },
 +};
 +
 +
@@ -426,8 +444,15 @@ index 0000000..150db35
 +	{ "rc",           "Override the preset rate-control",   OFFSET(rc),           AV_OPT_TYPE_INT,   { .i64 = -1 },                                  -1, INT_MAX, VE, "rc" },
 +	{ "cbr",          "Constant bitrate mode",              0,                    AV_OPT_TYPE_CONST, { .i64 = 0 },                       0, 0, VE, "rc" },
 +	{ "vbr",          "Variable bitrate mode",              0,                    AV_OPT_TYPE_CONST, { .i64 = 1 },                       0, 0, VE, "rc" },
-+		{ NULL }
-+	};
++
++	{ "preset",          "Set the encoding preset",            OFFSET(preset),       AV_OPT_TYPE_INT,   { .i64 = 3 }, 1, 4, VE, "preset" },
++	{ "default",         "",                                   0,                    AV_OPT_TYPE_CONST, { .i64 = 3 }, 0, 0, VE, "preset" },
++	{ "slow",            "",                        0,                    AV_OPT_TYPE_CONST, { .i64 = 4 },            0, 0, VE, "preset" },
++	{ "medium",          "",                        0,                    AV_OPT_TYPE_CONST, { .i64 = 3 },            0, 0, VE, "preset" },
++	{ "fast",            "",                        0,                    AV_OPT_TYPE_CONST, { .i64 = 2 },            0, 0, VE, "preset" },
++	{ "ultrafast",       "",                        0,                    AV_OPT_TYPE_CONST, { .i64 = 1 },            0, 0, VE, "preset" },
++	{ NULL }
++};
 +
 +
 +#define NVMPI_ENC_CLASS(NAME) \
@@ -457,5 +482,5 @@ index 0000000..150db35
 +		.wrapper_name   = "nvmpi", \
 +	};
 +
-+	NVMPI_ENC(h264, "H.264", AV_CODEC_ID_H264);
-+	NVMPI_ENC(hevc, "HEVC", AV_CODEC_ID_HEVC);
++NVMPI_ENC(h264, "H.264", AV_CODEC_ID_H264);
++NVMPI_ENC(hevc, "HEVC", AV_CODEC_ID_HEVC);

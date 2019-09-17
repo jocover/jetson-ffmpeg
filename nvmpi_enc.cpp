@@ -32,11 +32,16 @@ struct nvmpictx{
 	uint32_t encoder_pixfmt;
 	enum v4l2_mpeg_video_bitrate_mode ratecontrol;
 	enum v4l2_mpeg_video_h264_level level;
+	enum v4l2_enc_hw_preset_type hw_preset_type;
 	uint32_t iframe_interval;
 	uint32_t idr_interval;
 	uint32_t fps_n;
 	uint32_t fps_d;
 	bool enable_extended_colorformat;
+	uint32_t qmax;
+	uint32_t qmin;
+	uint32_t num_b_frames;
+	uint32_t num_reference_frames;
 
 	uint32_t packets_buf_size;
 	uint32_t packets_num;
@@ -90,7 +95,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 	}else{
 		ctx->packets_keyflag[ctx->buf_index]=false;
 	}
-		
+
 	ctx->buf_index=(ctx->buf_index+1)%ctx->packets_num;	
 
 	if (ctx->enc->capture_plane.qBuffer(*v4l2_buf, NULL) < 0)
@@ -121,6 +126,10 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ctx->buf_index=0;
 	ctx->enable_extended_colorformat=false;
 	ctx->packets_num=param->capture_num;
+	ctx->qmax=param->qmax;
+	ctx->qmin=param->qmin;
+	ctx->num_b_frames=param->max_b_frames;
+	ctx->num_reference_frames=param->refs;
 
 	switch(param->profile){
 		case 77://FF_PROFILE_H264_MAIN
@@ -140,55 +149,76 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	}
 
 	switch(param->level){
-	case 10:
-		ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_0;
-		break;
-	case 11:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_1;
-                break;
-	case 12:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_2;
-                break;
-	case 13:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_3;
-                break;
-	case 20:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_0;
-                break;
-	case 21:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_1;
-                break;
-	case 22:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_2;
-                break;
-	case 30:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_0;
-                break;
-	case 31:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_1;
-                break;
-	case 32:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_2;
-                break;
-	case 40:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_0;
-                break;
-	case 41:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
-                break;
-	case 42:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_2;
-                break;
-	case 50:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_0;
-                break;
-	case 51:
-                ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
-                break;
-	default:
-		ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
-		break;	
+		case 10:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_0;
+			break;
+		case 11:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_1;
+			break;
+		case 12:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_2;
+			break;
+		case 13:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_1_3;
+			break;
+		case 20:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_0;
+			break;
+		case 21:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_1;
+			break;
+		case 22:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_2_2;
+			break;
+		case 30:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_0;
+			break;
+		case 31:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_1;
+			break;
+		case 32:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_3_2;
+			break;
+		case 40:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_0;
+			break;
+		case 41:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
+			break;
+		case 42:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_4_2;
+			break;
+		case 50:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_0;
+			break;
+		case 51:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
+			break;
+		default:
+			ctx->level=V4L2_MPEG_VIDEO_H264_LEVEL_5_1;
+			break;	
 	}
+
+	switch(param->hw_preset_type){
+		case 1:
+			ctx->hw_preset_type = V4L2_ENC_HW_PRESET_ULTRAFAST;
+			break;
+		case 2:
+			ctx->hw_preset_type = V4L2_ENC_HW_PRESET_FAST;
+			break;
+		case 3:
+			ctx->hw_preset_type = V4L2_ENC_HW_PRESET_MEDIUM;
+			break;
+		case 4:
+			ctx->hw_preset_type = V4L2_ENC_HW_PRESET_SLOW;
+			break;
+		default:
+			ctx->hw_preset_type = V4L2_ENC_HW_PRESET_MEDIUM;
+			break;
+
+	}
+
+
 
 	if(param->enableLossless)
 		ctx->enableLossless=true;
@@ -237,6 +267,20 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ret = ctx->enc->setBitrate(ctx->bitrate);
 	TEST_ERROR(ret < 0, "Could not set encoder bitrate", ret);
 
+	ret=ctx->enc->setHWPresetType(ctx->hw_preset_type);
+	TEST_ERROR(ret < 0, "Could not set encoder HW Preset Type", ret);
+
+	if(ctx->num_reference_frames){
+		ret = ctx->enc->setNumReferenceFrames(ctx->num_reference_frames);
+		TEST_ERROR(ret < 0, "Could not set num reference frames", ret);
+	}
+
+	if(ctx->num_b_frames != (uint32_t) -1){
+		ret = ctx->enc->setNumBFrames(ctx->num_b_frames);
+		TEST_ERROR(ret < 0, "Could not set number of B Frames", ret);
+	}
+
+
 	if (codingType == NV_VIDEO_CodingH264 || codingType == NV_VIDEO_CodingHEVC)
 	{
 		ret = ctx->enc->setProfile(ctx->profile);
@@ -273,6 +317,9 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ret = ctx->enc->setIDRInterval(ctx->idr_interval);
 	TEST_ERROR(ret < 0, "Could not set encoder IDR interval", ret);
 
+	if(ctx->qmax>0 ||ctx->qmin >0){
+		ctx->enc->setQpRange(ctx->qmin, ctx->qmax, ctx->qmin,ctx->qmax, ctx->qmin, ctx->qmax);	
+	}
 	ret = ctx->enc->setIFrameInterval(ctx->iframe_interval);
 	TEST_ERROR(ret < 0, "Could not set encoder I-Frame interval", ret);
 
