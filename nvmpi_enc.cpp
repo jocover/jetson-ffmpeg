@@ -275,7 +275,7 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 		TEST_ERROR(ret < 0, "Could not set num reference frames", ret);
 	}
 
-	if(ctx->num_b_frames != (uint32_t) -1){
+	if(ctx->num_b_frames != (uint32_t) -1 && codingType == NV_VIDEO_CodingH264 ){
 		ret = ctx->enc->setNumBFrames(ctx->num_b_frames);
 		TEST_ERROR(ret < 0, "Could not set number of B Frames", ret);
 	}
