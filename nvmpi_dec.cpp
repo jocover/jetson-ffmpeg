@@ -263,19 +263,6 @@ void *dec_capture_loop_fcn(void *arg){
 				NvBufferParams parm;
 				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
 
-				/*
-				   printf("nv_buffer_size:%u\n",parm.nv_buffer_size);
-				   printf("pixel_format:%d\n",parm.pixel_format);
-				   printf("parm.pitch[0]:%u [1]:%u [2]:%u\n",parm.pitch[0],parm.pitch[1],parm.pitch[2]);
-				   printf("parm.offset[0]:%u [1]:%u [2]:%u\n",parm.offset[0],parm.offset[1],parm.offset[2]);
-				   printf("parm.width[0]:%u [1]:%u [2]:%u\n",parm.width[0],parm.width[1],parm.width[2]);
-				   printf("parm.height[0]:%u [1]:%u [2]:%u\n",parm.height[0],parm.height[1],parm.height[2]);
-				   printf("parm.psize[0]:%u [1]:%u [2]:%u\n",parm.psize[0],parm.psize[1],parm.psize[2]);
-				   printf("parm.layout[0]:%u [1]:%u [2]:%u\n",parm.layout[0],parm.layout[1],parm.layout[2]);
-				   printf("\n");
-				*/
-
-
 				if(!ctx->frame_size[0]){
 
 					for(int index=0;index<MAX_BUFFERS;index++){
@@ -437,7 +424,6 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
 
 	frame->width=ctx->coded_width;
 	frame->height=ctx->coded_height;
-
 
 	frame->linesize[0]=ctx->frame_linesize[0];
 	frame->linesize[1]=ctx->frame_linesize[1];
