@@ -30,6 +30,7 @@ struct nvmpictx
 	int numberCaptureBuffers;	
 	int dmaBufferFileDescriptor[MAX_BUFFERS];
 	nvPixFormat out_pixfmt;
+	unsigned int decoder_pixfmt;
 	std::thread * dec_capture_loop;
 	std::queue<int> * frame_pools;
 	unsigned char * bufptr_0[MAX_BUFFERS];
@@ -315,12 +316,33 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ret=ctx->dec->subscribeEvent(V4L2_EVENT_RESOLUTION_CHANGE, 0, 0);
 	TEST_ERROR(ret < 0, "Could not subscribe to V4L2_EVENT_RESOLUTION_CHANGE", ret);
 
-	if(codingType==NV_VIDEO_CodingH264){
-		ret = ctx->dec->setOutputPlaneFormat(V4L2_PIX_FMT_H264, CHUNK_SIZE);
-	}else if(codingType==NV_VIDEO_CodingHEVC){
-		ret = ctx->dec->setOutputPlaneFormat(V4L2_PIX_FMT_H265, CHUNK_SIZE);
+
+	switch(codingType){
+		case NV_VIDEO_CodingH264:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_H264;
+			break;
+		case NV_VIDEO_CodingHEVC:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_H265;
+			break;
+		case NV_VIDEO_CodingMPEG4:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_MPEG4;
+			break;
+		case NV_VIDEO_CodingMPEG2:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_MPEG2;
+			break;
+		case NV_VIDEO_CodingVP8:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_VP8;
+			break;
+		case NV_VIDEO_CodingVP9:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_VP9;
+			break;
+		default:
+			ctx->decoder_pixfmt=V4L2_PIX_FMT_H264;
+			break;
 	}
 
+	ret=ctx->dec->setOutputPlaneFormat(ctx->decoder_pixfmt, CHUNK_SIZE);
+	
 	TEST_ERROR(ret < 0, "Could not set output plane format", ret);
 
 	//ctx->nalu_parse_buffer = new char[CHUNK_SIZE];
