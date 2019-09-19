@@ -342,7 +342,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	}
 
 	ret=ctx->dec->setOutputPlaneFormat(ctx->decoder_pixfmt, CHUNK_SIZE);
-	
+
 	TEST_ERROR(ret < 0, "Could not set output plane format", ret);
 
 	//ctx->nalu_parse_buffer = new char[CHUNK_SIZE];
@@ -468,18 +468,28 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	ctx->eos=true;
 
+	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
+	{
+		if (ctx->dmaBufferFileDescriptor[index] != 0)
+		{
+			NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
+		}
+
+	}
+
+
+	if(ctx->dst_dma_fd != -1){
+		NvBufferDestroy(ctx->dst_dma_fd);
+		ctx->dst_dma_fd = -1;
+	}
+	delete ctx->dec;
+
 	for(int index=0;index<MAX_BUFFERS;index++){
 		delete ctx->bufptr_0[index];
 		delete ctx->bufptr_1[index];
 		delete ctx->bufptr_2[index];
 	}
 
-	if(ctx->dst_dma_fd != -1){
-		NvBufferDestroy(ctx->dst_dma_fd);
-		ctx->dst_dma_fd = -1;
-	}
-
-	delete ctx->dec;
 	delete ctx->frame_pools;
 	delete ctx;
 
