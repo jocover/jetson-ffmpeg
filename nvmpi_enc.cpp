@@ -100,7 +100,8 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 
 	if (ctx->enc->capture_plane.qBuffer(*v4l2_buf, NULL) < 0)
 	{
-		cerr << "Error while Qing buffer at capture plane" << endl;
+
+		ERROR_MSG("Error while Qing buffer at capture plane");
 		return false;
 	}
 
@@ -111,6 +112,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 
 	int ret;
+	log_level = LOG_LEVEL_INFO;
 	nvmpictx *ctx=new nvmpictx;
 	ctx->index=0;
 	ctx->width=param->width;
@@ -409,10 +411,6 @@ int nvmpi_encoder_put_frame(nvmpictx* ctx,nvFrame* frame){
 
 	ret = ctx->enc->output_plane.qBuffer(v4l2_buf, NULL);
 	TEST_ERROR(ret < 0, "Error while queueing buffer at output plane", ret);
-
-
-	if(v4l2_buf.m.planes[0].bytesused == 0)
-		printf("v4l2_buf.m.planes[0].bytesused == 0\n");
 
 	return 0;
 }

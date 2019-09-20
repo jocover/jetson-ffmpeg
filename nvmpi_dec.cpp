@@ -194,10 +194,9 @@ void *dec_capture_loop_fcn(void *arg){
 		ret = ctx->dec->dqEvent(v4l2Event, 50000);
 		if (ret < 0){
 			if (errno == EAGAIN){
-				printf( "Timed out waiting for first V4L2_EVENT_RESOLUTION_CHANGE\n");
+				( "Timed out waiting for first V4L2_EVENT_RESOLUTION_CHANGE\n");
 			}else{
-
-				printf("Error in dequeueing decoder event\n");
+				ERROR_MSG("Error in dequeueing decoder event");
 			}
 
 			break;
@@ -233,7 +232,7 @@ void *dec_capture_loop_fcn(void *arg){
 				else
 				{
 
-					//printf( "Error while calling dequeue at capture plane\n");
+					ERROR_MSG("Error while calling dequeue at capture plane");
 					ctx->eos=true;
 				}
 				break;
@@ -301,7 +300,7 @@ void *dec_capture_loop_fcn(void *arg){
 			}
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
-				printf("Error while queueing buffer at decoder capture plane\n");
+				ERROR_MSG("Error while queueing buffer at decoder capture plane");
 
 			}
 
@@ -313,6 +312,7 @@ void *dec_capture_loop_fcn(void *arg){
 nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 
 	int ret;
+	log_level = LOG_LEVEL_INFO;
 
 	nvmpictx* ctx=new nvmpictx;
 
