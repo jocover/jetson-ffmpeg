@@ -482,11 +482,13 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 		{
 			NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
 		}
+		ctx->dmaBufferFileDescriptor[index]=0;
 
 	}
 
 	if(ctx->dst_dma_fd != -1){
 		NvBufferDestroy(ctx->dst_dma_fd);
+		ctx->dst_dma_fd=0;
 	}
 	ctx->mutex->unlock();
 
