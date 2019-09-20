@@ -7,6 +7,7 @@
 #include <thread>
 #include <unistd.h>
 #include <queue>
+#include <mutex>
 
 #define CHUNK_SIZE 4000000
 #define MAX_BUFFERS 32
@@ -32,6 +33,7 @@ struct nvmpictx
 	nvPixFormat out_pixfmt;
 	unsigned int decoder_pixfmt;
 	std::thread * dec_capture_loop;
+	std::mutex* mutex;
 	std::queue<int> * frame_pools;
 	unsigned char * bufptr_0[MAX_BUFFERS];
 	unsigned char * bufptr_1[MAX_BUFFERS];
@@ -204,7 +206,7 @@ void *dec_capture_loop_fcn(void *arg){
 
 	respondToResolutionEvent(v4l2Format, v4l2Crop, ctx);
 
-	while (!ctx->dec->isInError()){
+	while (!(ctx->dec->isInError()||ctx->eos)){
 		NvBuffer *dec_buffer;
 		ret = ctx->dec->dqEvent(v4l2Event, false);	
 		if (ret == 0)
@@ -238,7 +240,6 @@ void *dec_capture_loop_fcn(void *arg){
 
 			}
 
-
 			dec_buffer->planes[0].fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			NvBufferRect src_rect, dest_rect;
 			src_rect.top = 0;
@@ -258,11 +259,13 @@ void *dec_capture_loop_fcn(void *arg){
 			transform_params.src_rect = src_rect;
 			transform_params.dst_rect = dest_rect;
 			if(!ctx->eos){
+				ctx->mutex->lock();
 				ret = NvBufferTransform(dec_buffer->planes[0].fd, ctx->dst_dma_fd, &transform_params);
 				TEST_ERROR(ret==-1, "Transform failed",ret);
 
 				NvBufferParams parm;
 				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
+				ctx->mutex->unlock();
 
 				if(!ctx->frame_size[0]){
 
@@ -282,10 +285,14 @@ void *dec_capture_loop_fcn(void *arg){
 				ctx->frame_linesize[2]=parm.width[2];
 				ctx->frame_size[2]=parm.psize[2];
 
+				ctx->mutex->lock();
+
 				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[buf_index]);
 				ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[buf_index]);	
 				if(ctx->out_pixfmt==NV_PIX_YUV420)
 					ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[buf_index]);	
+
+				ctx->mutex->unlock();
 
 				ctx->frame_pools->push(buf_index);
 				ctx->timestamp[buf_index]=v4l2_buf.timestamp.tv_usec;
@@ -361,7 +368,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->index=0;
 	ctx->frame_size[0]=0;
 	ctx->frame_pools=new std::queue<int>;
-
+	ctx->mutex = new std::mutex();
 	for(int index=0;index<MAX_BUFFERS;index++)
 		ctx->dmaBufferFileDescriptor[index]=0;
 	ctx->numberCaptureBuffers=0;
@@ -468,6 +475,7 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	ctx->eos=true;
 
+	ctx->mutex->lock();
 	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
 	{
 		if (ctx->dmaBufferFileDescriptor[index] != 0)
@@ -477,11 +485,11 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	}
 
-
 	if(ctx->dst_dma_fd != -1){
 		NvBufferDestroy(ctx->dst_dma_fd);
-		ctx->dst_dma_fd = -1;
 	}
+	ctx->mutex->unlock();
+
 	delete ctx->dec;
 
 	for(int index=0;index<MAX_BUFFERS;index++){
