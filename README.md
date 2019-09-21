@@ -10,6 +10,7 @@ L4T Multimedia API for ffmpeg
     cmake ..
     make
     sudo make install
+    sudo ldconfig
 	
 **2.patch ffmpeg and build**
 
@@ -22,11 +23,21 @@ L4T Multimedia API for ffmpeg
 
 **3.using**
 
-Decode :	
+### Supports Decoding
+  - MPEG2
+  - H.264/AVC
+  - HEVC
+  - VP8
+  - VP9
+  
+**example**
 
     ffmpeg -c:v h264_nvmpi -i input_file -f null -
-    ffmpeg -c:v hevc_nvmpi -i input_file -f null -
-Encode :
+	
+### Supports Encoding
+  - H.264/AVC
+  - HEVC
+  
+**example**
 
     ffmpeg -i input_file -c:v h264_nvmpi <output.mp4>
-    ffmpeg -i input_file -c:v hevc_nvmpi <output.mp4>
