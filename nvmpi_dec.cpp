@@ -194,7 +194,7 @@ void *dec_capture_loop_fcn(void *arg){
 		ret = ctx->dec->dqEvent(v4l2Event, 50000);
 		if (ret < 0){
 			if (errno == EAGAIN){
-				( "Timed out waiting for first V4L2_EVENT_RESOLUTION_CHANGE\n");
+				INFO_MSG("Timed out waiting for first V4L2_EVENT_RESOLUTION_CHANGE\n");
 			}else{
 				ERROR_MSG("Error in dequeueing decoder event");
 			}
@@ -257,14 +257,16 @@ void *dec_capture_loop_fcn(void *arg){
 			transform_params.transform_filter = NvBufferTransform_Filter_Smart;
 			transform_params.src_rect = src_rect;
 			transform_params.dst_rect = dest_rect;
+
+			ctx->mutex->lock();
+
 			if(!ctx->eos){
-				ctx->mutex->lock();
+
 				ret = NvBufferTransform(dec_buffer->planes[0].fd, ctx->dst_dma_fd, &transform_params);
 				TEST_ERROR(ret==-1, "Transform failed",ret);
 
 				NvBufferParams parm;
 				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
-				ctx->mutex->unlock();
 
 				if(!ctx->frame_size[0]){
 
@@ -284,20 +286,20 @@ void *dec_capture_loop_fcn(void *arg){
 				ctx->frame_linesize[2]=parm.width[2];
 				ctx->frame_size[2]=parm.psize[2];
 
-				ctx->mutex->lock();
 
 				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[buf_index]);
 				ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[buf_index]);	
 				if(ctx->out_pixfmt==NV_PIX_YUV420)
 					ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[buf_index]);	
 
-				ctx->mutex->unlock();
-
 				ctx->frame_pools->push(buf_index);
 				ctx->timestamp[buf_index]=v4l2_buf.timestamp.tv_usec;
 
 				buf_index=(buf_index+1)%MAX_BUFFERS;
+
 			}
+			ctx->mutex->unlock();
+
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
 				ERROR_MSG("Error while queueing buffer at decoder capture plane");
@@ -473,23 +475,10 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
 
 int nvmpi_decoder_close(nvmpictx* ctx){
 
+	ctx->mutex->lock();
+
 	ctx->eos=true;
 
-	ctx->mutex->lock();
-	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
-	{
-		if (ctx->dmaBufferFileDescriptor[index] != 0)
-		{
-			NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
-		}
-		ctx->dmaBufferFileDescriptor[index]=0;
-
-	}
-
-	if(ctx->dst_dma_fd != -1){
-		NvBufferDestroy(ctx->dst_dma_fd);
-		ctx->dst_dma_fd=0;
-	}
 	ctx->mutex->unlock();
 
 	delete ctx->dec;
