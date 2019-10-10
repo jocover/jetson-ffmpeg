@@ -356,10 +356,10 @@ index 0000000..1d92aeb
 +NVMPI_DEC(vp8,  AV_CODEC_ID_VP8,NULL);
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..3facaea
+index 0000000..959f130
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,220 @@
+@@ -0,0 +1,221 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -401,6 +401,7 @@ index 0000000..3facaea
 +	param.level=nvmpi_context->level;
 +	param.capture_num=nvmpi_context->num_capture_buffers;
 +	param.hw_preset_type=nvmpi_context->preset;
++	param.insert_spspps_idr=(avctx->flags & AV_CODEC_FLAG_GLOBAL_HEADER)?0:1;
 +
 +	if(nvmpi_context->rc==1){
 +		param.mode_vbr=1;

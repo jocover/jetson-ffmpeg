@@ -18,6 +18,7 @@ typedef struct _NVENCPARAM{
 	unsigned int peak_bitrate;
 	char enableLossless;
 	char mode_vbr;
+	char insert_spspps_idr;
 	unsigned int iframe_interval;
 	unsigned int idr_interval;
 	unsigned int fps_n;
@@ -28,6 +29,7 @@ typedef struct _NVENCPARAM{
 	unsigned int qmax;
 	unsigned int qmin;
 	unsigned int hw_preset_type;
+	
 } nvEncParam;
 
 typedef struct _NVPACKET{

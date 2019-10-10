@@ -42,6 +42,7 @@ struct nvmpictx{
 	uint32_t qmin;
 	uint32_t num_b_frames;
 	uint32_t num_reference_frames;
+	bool insert_sps_pps_at_idr;
 
 	uint32_t packets_buf_size;
 	uint32_t packets_num;
@@ -132,6 +133,7 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ctx->qmin=param->qmin;
 	ctx->num_b_frames=param->max_b_frames;
 	ctx->num_reference_frames=param->refs;
+	ctx->insert_sps_pps_at_idr=(param->insert_spspps_idr==1)?true:false;
 
 	switch(param->profile){
 		case 77://FF_PROFILE_H264_MAIN
@@ -324,7 +326,11 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	}
 	ret = ctx->enc->setIFrameInterval(ctx->iframe_interval);
 	TEST_ERROR(ret < 0, "Could not set encoder I-Frame interval", ret);
-
+	
+	if(ctx->insert_sps_pps_at_idr){
+		ret = ctx->enc->setInsertSpsPpsAtIdrEnabled(true);
+		TEST_ERROR(ret < 0, "Could not set insertSPSPPSAtIDR", ret);
+	}
 
 	ret = ctx->enc->setFrameRate(ctx->fps_n, ctx->fps_d);
 	TEST_ERROR(ret < 0, "Could not set framerate", ret);
