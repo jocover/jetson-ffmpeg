@@ -356,10 +356,10 @@ index 0000000..1d92aeb
 +NVMPI_DEC(vp8,  AV_CODEC_ID_VP8,NULL);
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..959f130
+index 0000000..f332107
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,272 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -427,6 +427,56 @@ index 0000000..959f130
 +	}
 +
 +
++	if ((avctx->flags & AV_CODEC_FLAG_GLOBAL_HEADER) && (avctx->codec->id == AV_CODEC_ID_H264)){
++
++		uint8_t *dst[4];
++		int linesize[4];
++		nvFrame _nvframe={0};
++		nvPacket packet={0};
++		int i;
++		int ret;
++		nvmpictx* _ctx;
++		av_image_alloc(dst, linesize,avctx->width,avctx->height,avctx->pix_fmt,32);
++
++		_ctx=nvmpi_create_encoder(NV_VIDEO_CodingH264,&param);
++		i=0;
++
++		while(1){
++
++			_nvframe.payload[0]=dst[0];
++			_nvframe.payload[1]=dst[1];
++			_nvframe.payload[2]=dst[2];
++			_nvframe.payload_size[0]=linesize[0]*avctx->height;
++			_nvframe.payload_size[1]=linesize[1]*avctx->height/2;
++			_nvframe.payload_size[2]=linesize[2]*avctx->height/2;
++
++			nvmpi_encoder_put_frame(_ctx,&_nvframe);
++
++			ret=nvmpi_encoder_get_packet(_ctx,&packet);
++
++			if(ret<0)
++				continue;
++
++			//find idr index 0x0000000165
++			while((packet.payload[i]!=0||packet.payload[i+1]!=0||packet.payload[i+2]!=0||packet.payload[i+3]!=0x01||packet.payload[i+4]!=0x65)){
++				i++;
++
++			}
++
++			avctx->extradata_size=i;
++			avctx->extradata	= av_mallocz( avctx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE );
++			memcpy( avctx->extradata, packet.payload,avctx->extradata_size);
++			memset( avctx->extradata + avctx->extradata_size, 0, AV_INPUT_BUFFER_PADDING_SIZE );
++
++			break;
++
++		}
++
++		nvmpi_encoder_close(_ctx);
++
++
++	}
++
 +	if(avctx->codec->id == AV_CODEC_ID_H264)
 +		nvmpi_context->ctx=nvmpi_create_encoder(NV_VIDEO_CodingH264,&param);
 +	else if(avctx->codec->id == AV_CODEC_ID_HEVC){
@@ -479,6 +529,7 @@ index 0000000..959f130
 +
 +	if(packet.flags& AV_PKT_FLAG_KEY)
 +		pkt->flags = AV_PKT_FLAG_KEY;
++
 +
 +	*got_packet = 1;
 +
