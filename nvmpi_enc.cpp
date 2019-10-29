@@ -335,10 +335,10 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ret = ctx->enc->setFrameRate(ctx->fps_n, ctx->fps_d);
 	TEST_ERROR(ret < 0, "Could not set framerate", ret);
 
-	ret = ctx->enc->output_plane.setupPlane(V4L2_MEMORY_USERPTR, 10, false, true);
+	ret = ctx->enc->output_plane.setupPlane(V4L2_MEMORY_USERPTR, ctx->packets_num, false, true);
 	TEST_ERROR(ret < 0, "Could not setup output plane", ret);
 
-	ret = ctx->enc->capture_plane.setupPlane(V4L2_MEMORY_MMAP, 10, true, false);
+	ret = ctx->enc->capture_plane.setupPlane(V4L2_MEMORY_MMAP, ctx->packets_num, true, false);
 	TEST_ERROR(ret < 0, "Could not setup capture plane", ret);
 
 	ret = ctx->enc->subscribeEvent(V4L2_EVENT_EOS,0,0);
