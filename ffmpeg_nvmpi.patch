@@ -356,7 +356,7 @@ index 0000000..1d92aeb
 +NVMPI_DEC(vp8,  AV_CODEC_ID_VP8,NULL);
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..9a370bd
+index 0000000..0e1390e
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
 @@ -0,0 +1,272 @@
@@ -436,7 +436,7 @@ index 0000000..9a370bd
 +		int i;
 +		int ret;
 +		nvmpictx* _ctx;
-+		av_image_alloc(dst, linesize,avctx->width,avctx->height,avctx->pix_fmt,32);
++		av_image_alloc(dst, linesize,avctx->width,avctx->height,avctx->pix_fmt,1);
 +
 +		_ctx=nvmpi_create_encoder(NV_VIDEO_CodingH264,&param);
 +		i=0;
