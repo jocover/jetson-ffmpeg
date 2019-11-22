@@ -179,6 +179,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 		v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		v4l2_buf.memory = V4L2_MEMORY_DMABUF;
 		v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[i];
+
 		ret = ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL);
 		TEST_ERROR(ret < 0, "Error Qing buffer at output plane", ret);
 	}
@@ -426,7 +427,6 @@ int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 	v4l2_buf.timestamp.tv_usec = packet->pts;// - (v4l2_buf.timestamp.tv_sec * (time_t)1000000);
 
 
-
 	ret = ctx->dec->output_plane.qBuffer(v4l2_buf, NULL);
 	if (ret < 0) {
 		std::cout << "Error Qing buffer at output plane" << std::endl;
@@ -490,6 +490,22 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 		delete ctx->dec_capture_loop;
 		ctx->dec_capture_loop = nullptr;
 	}
+
+	if(ctx->dst_dma_fd != -1)
+	{
+		NvBufferDestroy(ctx->dst_dma_fd);
+		ctx->dst_dma_fd = -1;
+	}
+
+	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
+	{
+		if (ctx->dmaBufferFileDescriptor[index] != 0)
+		{	
+			int ret = NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
+			TEST_ERROR(ret < 0, "Failed to Destroy NvBuffer", ret);
+		}
+
+	}
 	
 	delete ctx->dec; ctx->dec = nullptr;
 
@@ -501,6 +517,7 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	delete ctx->mutex; ctx->mutex = nullptr;
 	delete ctx->frame_pools; ctx->frame_pools = nullptr;
+
 	delete ctx; ctx = nullptr;
 
 	return 0;
