@@ -100,9 +100,10 @@ NvVideoEncoder::setOutputPlaneFormat(uint32_t pixfmt, uint32_t width,
     uint32_t num_bufferplanes;
     NvBuffer::NvBufferPlaneFormat planefmts[MAX_PLANES];
 
-    if (pixfmt != V4L2_PIX_FMT_YUV420M && pixfmt != V4L2_PIX_FMT_YUV444M)
+    if (pixfmt != V4L2_PIX_FMT_YUV420M && pixfmt != V4L2_PIX_FMT_YUV444M &&
+        pixfmt != V4L2_PIX_FMT_P010M)
     {
-        COMP_ERROR_MSG("Only V4L2_PIX_FMT_YUV420M V4L2_PIX_FMT_YUV444M is supported");
+        COMP_ERROR_MSG("Only YUV420M, YUV444M and P010M are supported");
         return -1;
     }
 
@@ -133,6 +134,8 @@ NvVideoEncoder::setCapturePlaneFormat(uint32_t pixfmt, uint32_t width,
     {
         case V4L2_PIX_FMT_H264:
         case V4L2_PIX_FMT_H265:
+        case V4L2_PIX_FMT_VP8:
+        case V4L2_PIX_FMT_VP9:
             capture_plane_pixfmt = pixfmt;
             break;
         default:

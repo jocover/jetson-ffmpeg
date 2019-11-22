@@ -49,7 +49,12 @@
  * This file declares NVIDIA V4L2 extensions, controls, and structures.
  *
  */
+/**
+ * Defines V4L2 pixel format for DIVX.
+ */
+#define V4L2_PIX_FMT_DIVX4     v4l2_fourcc('D', 'V', 'X', '4')
 
+#define V4L2_PIX_FMT_DIVX5     v4l2_fourcc('D', 'V', 'X', '5')
 /**
  * Defines V4L2 pixel format for H.265.
  */
@@ -423,6 +428,10 @@ struct v4l2_ctrl_vp8_frame_hdr {
  * Read only. Valid after #V4L2_EVENT_RESOLUTION_CHANGE)
  * - #V4L2_CID_MPEG_VIDEODEC_INPUT_METADATA
  * - #V4L2_CID_MPEG_VIDEODEC_METADATA
+ * - #V4L2_CID_MPEG_VIDEO_BUF_API_TYPE
+ * - #V4L2_CID_MPEG_VIDEO_CUDA_MEM_TYPE
+ * - #V4L2_CID_MPEG_VIDEO_CUDA_GPU_ID
+ * - #V4L2_CID_MPEG_VIDEODEC_DROP_FRAME_INTERVAL
  *
  * ### Supported Events
  * Event                         | Purpose
@@ -600,7 +609,7 @@ struct v4l2_ctrl_vp8_frame_hdr {
  * - #V4L2_CID_VIDEO_CONVERT_FLIP_METHOD
  * - #V4L2_CID_VIDEO_CONVERT_INTERPOLATION_METHOD
  * - #V4L2_CID_VIDEO_CONVERT_TNR_ALGORITHM
- * - #V4L2_CID_VIDEO_CONVERT_YUV_RESCALE
+ * - #V4L2_CID_VIDEO_CONVERT_YUV_RESCALE_METHOD
  *
  * ### Cropping
  * Video converter supports cropping using \c VIDIOC_S_SELECTION IOCTL with type
@@ -1074,6 +1083,63 @@ struct v4l2_ctrl_vp8_frame_hdr {
  */
 #define V4L2_CID_MPEG_VIDEOENC_ENABLE_ALLIFRAME_ENCODE (V4L2_CID_MPEG_BASE+555)
 
+/**
+ * Defines the Control ID to set buf api to be used by decoder/encoder.
+ *
+ * A boolean value should be supplied with this control, default is 0
+ * This has to be called before any other ioctls are used and cannot be changed.
+ *
+ * @attention This control must be set after setting formats on both the planes
+ * and before requesting buffers on either plane.
+ * This is internal ioctl due to be removed later.
+ */
+#define V4L2_CID_MPEG_VIDEO_BUF_API_TYPE (V4L2_CID_MPEG_BASE+556)
+
+/**
+ * Defines the Control ID to set cuda memory type to be used by decoder/encoder.
+ *
+ * This control can be used by the decoder to set the memory type for surfaces.
+ * A value of \c v4l2_cuda_mem_type needs to be set with this control.
+ *
+ * @attention This control must be set after setting formats on both the planes
+ * and before requesting buffers on either plane.
+ */
+#define V4L2_CID_MPEG_VIDEO_CUDA_MEM_TYPE (V4L2_CID_MPEG_BASE+557)
+
+/**
+ * Defines the Control ID to set GPU ID to be used by decoder/encoder.
+ *
+ * An integer value should be supplied with this control.
+ *
+ * @attention This control must be set after setting formats on both the planes
+ * and before requesting buffers on either plane.
+ */
+#define V4L2_CID_MPEG_VIDEO_CUDA_GPU_ID (V4L2_CID_MPEG_BASE+558)
+
+/**
+ * Defines the Control ID to set drop frames interval for decoder.
+ *
+ * An integer value should be supplied with this control. A value of "x"
+ * indicates every "x"th frame should be given out from the decoder, rest shall
+ * dropped after decoding.
+ *
+ * @attention This control must be set after setting formats on both the planes
+ * and before requesting buffers on either plane.
+ */
+#define V4L2_CID_MPEG_VIDEODEC_DROP_FRAME_INTERVAL (V4L2_CID_MPEG_BASE+559)
+
+/**
+ * Control ID to enable/disable setting for attaching VP8/9 headers.
+ * Only to be used for VP8/9 pixel format not for H264/5.
+ *
+ * A boolean value should be supplied with this control.
+ * If value is false headers will be disabled and true will enable the headers.
+ *
+ * @attention This control should be set after setting formats on both the planes
+ * and before requesting buffers on either plane.
+ */
+ #define V4L2_CID_MPEG_VIDEOENC_VPX_HEADERS_WITH_FRAME (V4L2_CID_MPEG_BASE+560)
+
 /** @} */
 
 /** @addtogroup V4L2Dec */
@@ -1087,6 +1153,17 @@ enum v4l2_skip_frames_type {
     V4L2_SKIP_FRAMES_TYPE_NONREF = 1,
     /** Skip all frames except IDR */
     V4L2_SKIP_FRAMES_TYPE_DECODE_IDR_ONLY = 2,
+};
+
+/**
+ * Enum v4l2_cuda_mem_type, possible methods for cuda memory tpye. */
+enum v4l2_cuda_mem_type {
+    /** Memory type device. */
+    V4L2_CUDA_MEM_TYPE_DEVICE = 0,
+    /** Memory type host. */
+    V4L2_CUDA_MEM_TYPE_PINNED = 1,
+    /** Memory type unified. */
+    V4L2_CUDA_MEM_TYPE_UNIFIED = 2,
 };
 
 /**
