@@ -208,7 +208,7 @@ void *dec_capture_loop_fcn(void *arg){
 
 	while (!(ctx->dec->isInError()||ctx->eos)){
 		NvBuffer *dec_buffer;
-		//printf("%lx dqEvent %d\n", (unsigned long)ctx, ctx->eos);
+
 		ret = ctx->dec->dqEvent(v4l2Event, false);	
 		if (ret == 0)
 		{
@@ -226,7 +226,7 @@ void *dec_capture_loop_fcn(void *arg){
 			struct v4l2_buffer v4l2_buf;
 			struct v4l2_plane planes[MAX_PLANES];
 			v4l2_buf.m.planes = planes;
-			//printf("%lx capture_plane.dqBuffer %d\n", (unsigned long)ctx, ctx->eos);
+
 			if (ctx->dec->capture_plane.dqBuffer(v4l2_buf, &dec_buffer, NULL, 0)){
 				if (errno == EAGAIN)
 				{
@@ -302,7 +302,6 @@ void *dec_capture_loop_fcn(void *arg){
 
 			}
 			
-			//printf("%lx check eos %d\n", (unsigned long)ctx, ctx->eos);
 			if (ctx->eos) {
 				return NULL;
 			}
@@ -324,16 +323,12 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	log_level = LOG_LEVEL_INFO;
 
 	nvmpictx* ctx=new nvmpictx;
-	
-	//printf("%lx nvmpi_create_decoder\n", (unsigned long)ctx);
 
 	ctx->dec = NvVideoDecoder::createVideoDecoder("dec0");
 	TEST_ERROR(!ctx->dec, "Could not create decoder",ret);
 
-
 	ret=ctx->dec->subscribeEvent(V4L2_EVENT_RESOLUTION_CHANGE, 0, 0);
 	TEST_ERROR(ret < 0, "Could not subscribe to V4L2_EVENT_RESOLUTION_CHANGE", ret);
-
 
 	switch(codingType){
 		case NV_VIDEO_CodingH264:
@@ -484,8 +479,6 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
 
 int nvmpi_decoder_close(nvmpictx* ctx){
 
-	//printf("%lx nvmpi_decoder_close\n", (unsigned long)ctx);
-
 	ctx->mutex->lock();
 	ctx->eos=true;
 	ctx->mutex->unlock();
@@ -493,7 +486,6 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	ctx->dec->capture_plane.setStreamStatus(false);
 	
 	if (ctx->dec_capture_loop) {
-		//printf("%lx join capture loop\n", (unsigned long)ctx);
 		ctx->dec_capture_loop->join();
 		delete ctx->dec_capture_loop;
 		ctx->dec_capture_loop = nullptr;
@@ -511,7 +503,6 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	delete ctx->frame_pools; ctx->frame_pools = nullptr;
 	delete ctx; ctx = nullptr;
 
-	printf("%lx end\n", (unsigned long)ctx);
 	return 0;
 }
 
