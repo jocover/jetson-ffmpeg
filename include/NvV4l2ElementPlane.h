@@ -124,6 +124,25 @@ public:
      */
     int setFormat(struct v4l2_format & format);
 
+    /**
+     * Maps the NvMMBuffer to NvBuffer for V4L2_MEMORY_DMABUF.
+     *
+     * @param[in] v4l2_buf Address of the NvBuffer to which the NvMMBuffer is mapped.
+     * @param[in] dmabuff_fd Index to the field that holds NvMMBuffer attributes.
+     * @return 0 for success, -1 otherwise.
+     */
+
+    int mapOutputBuffers(struct v4l2_buffer &v4l2_buf, int dmabuff_fd);
+
+    /**
+     * Unmaps the NvMMBuffer for V4L2_MEMORY_DMABUF.
+     *
+     * @param[in] index for the current buffer index.
+     * @param[in] dmabuff_fd Index to the field that holds NvMMBuffer attributes.
+     * @return 0 for success, -1 otherwise.
+     */
+
+    int unmapOutputBuffers(int index, int dmabuff_fd);
 
     /**
      * Gets the cropping rectangle for the plane.

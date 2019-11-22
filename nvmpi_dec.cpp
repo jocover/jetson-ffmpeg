@@ -22,19 +22,19 @@ using namespace std;
 
 struct nvmpictx
 {
-	NvVideoDecoder *dec;
-	bool eos;
-	int index;
-	unsigned int coded_width;
-	unsigned int coded_height;
-	int dst_dma_fd;
-	int numberCaptureBuffers;	
+	NvVideoDecoder *dec{nullptr};
+	bool eos{false};
+	int index{0};
+	unsigned int coded_width{0};
+	unsigned int coded_height{0};
+	int dst_dma_fd{0};
+	int numberCaptureBuffers{0};
 	int dmaBufferFileDescriptor[MAX_BUFFERS];
 	nvPixFormat out_pixfmt;
-	unsigned int decoder_pixfmt;
-	std::thread * dec_capture_loop;
-	std::mutex* mutex;
-	std::queue<int> * frame_pools;
+	unsigned int decoder_pixfmt{0};
+	std::thread * dec_capture_loop{nullptr};
+	std::mutex* mutex{nullptr};
+	std::queue<int> * frame_pools{nullptr};
 	unsigned char * bufptr_0[MAX_BUFFERS];
 	unsigned char * bufptr_1[MAX_BUFFERS];
 	unsigned char * bufptr_2[MAX_BUFFERS];
@@ -44,6 +44,7 @@ struct nvmpictx
 };
 
 void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx){
+	
 	int32_t minimumDecoderCaptureBuffers;
 	int ret=0;
 	NvBufferCreateParams input_params = {0};
@@ -185,7 +186,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 void *dec_capture_loop_fcn(void *arg){
 	nvmpictx* ctx=(nvmpictx*)arg;
-
+	
 	struct v4l2_format v4l2Format;
 	struct v4l2_crop v4l2Crop;
 	struct v4l2_event v4l2Event;
@@ -207,6 +208,7 @@ void *dec_capture_loop_fcn(void *arg){
 
 	while (!(ctx->dec->isInError()||ctx->eos)){
 		NvBuffer *dec_buffer;
+
 		ret = ctx->dec->dqEvent(v4l2Event, false);	
 		if (ret == 0)
 		{
@@ -220,10 +222,11 @@ void *dec_capture_loop_fcn(void *arg){
 
 
 
-		while(true){
+		while(!ctx->eos){
 			struct v4l2_buffer v4l2_buf;
 			struct v4l2_plane planes[MAX_PLANES];
 			v4l2_buf.m.planes = planes;
+
 			if (ctx->dec->capture_plane.dqBuffer(v4l2_buf, &dec_buffer, NULL, 0)){
 				if (errno == EAGAIN)
 				{
@@ -298,21 +301,24 @@ void *dec_capture_loop_fcn(void *arg){
 				buf_index=(buf_index+1)%MAX_BUFFERS;
 
 			}
+			
+			if (ctx->eos) {
+				return NULL;
+			}
+			
 			ctx->mutex->unlock();
 
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
 				ERROR_MSG("Error while queueing buffer at decoder capture plane");
-
 			}
-
 		}
 
 	}
 }
 
 nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
-
+	
 	int ret;
 	log_level = LOG_LEVEL_INFO;
 
@@ -321,10 +327,8 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->dec = NvVideoDecoder::createVideoDecoder("dec0");
 	TEST_ERROR(!ctx->dec, "Could not create decoder",ret);
 
-
 	ret=ctx->dec->subscribeEvent(V4L2_EVENT_RESOLUTION_CHANGE, 0, 0);
 	TEST_ERROR(ret < 0, "Could not subscribe to V4L2_EVENT_RESOLUTION_CHANGE", ret);
-
 
 	switch(codingType){
 		case NV_VIDEO_CodingH264:
@@ -384,7 +388,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 
 int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 	int ret;
-
+	
 	struct v4l2_buffer v4l2_buf;
 	struct v4l2_plane planes[MAX_PLANES];
 	NvBuffer *nvBuffer;
@@ -444,7 +448,7 @@ int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 
 
 int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
-
+	
 	int ret,picture_index;
 
 	if(ctx->frame_pools->empty()){
@@ -476,12 +480,18 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
 int nvmpi_decoder_close(nvmpictx* ctx){
 
 	ctx->mutex->lock();
-
 	ctx->eos=true;
-
 	ctx->mutex->unlock();
-
-	delete ctx->dec;
+	
+	ctx->dec->capture_plane.setStreamStatus(false);
+	
+	if (ctx->dec_capture_loop) {
+		ctx->dec_capture_loop->join();
+		delete ctx->dec_capture_loop;
+		ctx->dec_capture_loop = nullptr;
+	}
+	
+	delete ctx->dec; ctx->dec = nullptr;
 
 	for(int index=0;index<MAX_BUFFERS;index++){
 		delete ctx->bufptr_0[index];
@@ -489,8 +499,9 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 		delete ctx->bufptr_2[index];
 	}
 
-	delete ctx->frame_pools;
-	delete ctx;
+	delete ctx->mutex; ctx->mutex = nullptr;
+	delete ctx->frame_pools; ctx->frame_pools = nullptr;
+	delete ctx; ctx = nullptr;
 
 	return 0;
 }
