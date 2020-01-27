@@ -77,7 +77,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 		ctx->packets_buf_size=buffer->planes[0].bytesused;
 
 		for(int index=0;index< ctx->packets_num;index++){
-			delete ctx->packets[index];
+			delete[] ctx->packets[index];
 			ctx->packets[index]=new unsigned char[ctx->packets_buf_size];	
 		}
 	}

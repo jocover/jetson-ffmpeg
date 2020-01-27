@@ -24,6 +24,7 @@ struct nvmpictx
 {
 	NvVideoDecoder *dec{nullptr};
 	bool eos{false};
+	bool got_res_event{false};
 	int index{0};
 	unsigned int coded_width{0};
 	unsigned int coded_height{0};
@@ -183,6 +184,8 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 		ret = ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL);
 		TEST_ERROR(ret < 0, "Error Qing buffer at output plane", ret);
 	}
+
+	ctx->got_res_event = true;
 }
 
 void *dec_capture_loop_fcn(void *arg){
@@ -192,25 +195,11 @@ void *dec_capture_loop_fcn(void *arg){
 	struct v4l2_crop v4l2Crop;
 	struct v4l2_event v4l2Event;
 	int ret,buf_index=0;
-	do{
-		ret = ctx->dec->dqEvent(v4l2Event, 50000);
-		if (ret < 0){
-			if (errno == EAGAIN){
-				INFO_MSG("Timed out waiting for first V4L2_EVENT_RESOLUTION_CHANGE\n");
-			}else{
-				ERROR_MSG("Error in dequeueing decoder event");
-			}
-
-			break;
-		}
-	}while((v4l2Event.type != V4L2_EVENT_RESOLUTION_CHANGE));
-
-	respondToResolutionEvent(v4l2Format, v4l2Crop, ctx);
 
 	while (!(ctx->dec->isInError()||ctx->eos)){
 		NvBuffer *dec_buffer;
 
-		ret = ctx->dec->dqEvent(v4l2Event, false);	
+		ret = ctx->dec->dqEvent(v4l2Event, ctx->got_res_event ? 0 : 500);
 		if (ret == 0)
 		{
 			switch (v4l2Event.type)
@@ -221,7 +210,9 @@ void *dec_capture_loop_fcn(void *arg){
 			}
 		}	
 
-
+		if (!ctx->got_res_event) {
+			continue;
+		}
 
 		while(!ctx->eos){
 			struct v4l2_buffer v4l2_buf;
@@ -303,12 +294,12 @@ void *dec_capture_loop_fcn(void *arg){
 
 			}
 			
+			ctx->mutex->unlock();
+
 			if (ctx->eos) {
 				return NULL;
 			}
 			
-			ctx->mutex->unlock();
-
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
 				ERROR_MSG("Error while queueing buffer at decoder capture plane");
@@ -372,12 +363,18 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->out_pixfmt=pixFormat;
 	ctx->dst_dma_fd=-1;
 	ctx->eos=false;
+	ctx->got_res_event=false;
 	ctx->index=0;
 	ctx->frame_size[0]=0;
 	ctx->frame_pools=new std::queue<int>;
 	ctx->mutex = new std::mutex();
 	for(int index=0;index<MAX_BUFFERS;index++)
 		ctx->dmaBufferFileDescriptor[index]=0;
+	for(int index=0;index<MAX_BUFFERS;index++){
+		ctx->bufptr_0[index] = nullptr;
+		ctx->bufptr_1[index] = nullptr;
+		ctx->bufptr_2[index] = nullptr;
+	}
 	ctx->numberCaptureBuffers=0;
 	ctx->dec_capture_loop=new thread(dec_capture_loop_fcn,ctx);
 
@@ -510,9 +507,9 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	delete ctx->dec; ctx->dec = nullptr;
 
 	for(int index=0;index<MAX_BUFFERS;index++){
-		delete ctx->bufptr_0[index];
-		delete ctx->bufptr_1[index];
-		delete ctx->bufptr_2[index];
+		delete[] ctx->bufptr_0[index];
+		delete[] ctx->bufptr_1[index];
+		delete[] ctx->bufptr_2[index];
 	}
 
 	delete ctx->mutex; ctx->mutex = nullptr;
