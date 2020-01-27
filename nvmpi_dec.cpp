@@ -510,9 +510,9 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	delete ctx->dec; ctx->dec = nullptr;
 
 	for(int index=0;index<MAX_BUFFERS;index++){
-		delete ctx->bufptr_0[index];
-		delete ctx->bufptr_1[index];
-		delete ctx->bufptr_2[index];
+		delete[] ctx->bufptr_0[index];
+		delete[] ctx->bufptr_1[index];
+		delete[] ctx->bufptr_2[index];
 	}
 
 	delete ctx->mutex; ctx->mutex = nullptr;
