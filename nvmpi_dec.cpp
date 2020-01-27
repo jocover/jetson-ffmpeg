@@ -303,12 +303,12 @@ void *dec_capture_loop_fcn(void *arg){
 
 			}
 			
+			ctx->mutex->unlock();
+
 			if (ctx->eos) {
 				return NULL;
 			}
 			
-			ctx->mutex->unlock();
-
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
 				ERROR_MSG("Error while queueing buffer at decoder capture plane");
