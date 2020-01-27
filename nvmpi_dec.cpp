@@ -378,6 +378,11 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->mutex = new std::mutex();
 	for(int index=0;index<MAX_BUFFERS;index++)
 		ctx->dmaBufferFileDescriptor[index]=0;
+	for(int index=0;index<MAX_BUFFERS;index++){
+		ctx->bufptr_0[index] = nullptr;
+		ctx->bufptr_1[index] = nullptr;
+		ctx->bufptr_2[index] = nullptr;
+	}
 	ctx->numberCaptureBuffers=0;
 	ctx->dec_capture_loop=new thread(dec_capture_loop_fcn,ctx);
 
