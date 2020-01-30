@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <queue>
 #include <mutex>
+#include <condition_variable>
 
 #define CHUNK_SIZE 4000000
 #define MAX_BUFFERS 32
@@ -35,6 +36,7 @@ struct nvmpictx
 	unsigned int decoder_pixfmt{0};
 	std::thread * dec_capture_loop{nullptr};
 	std::mutex* mutex{nullptr};
+	std::condition_variable* has_frame_cv{nullptr};
 	std::queue<int> * frame_pools{nullptr};
 	unsigned char * bufptr_0[MAX_BUFFERS];
 	unsigned char * bufptr_1[MAX_BUFFERS];
@@ -297,16 +299,20 @@ void *dec_capture_loop_fcn(void *arg){
 			ctx->mutex->unlock();
 
 			if (ctx->eos) {
-				return NULL;
+				break;
 			}
-			
+
+			ctx->has_frame_cv->notify_one();
+
 			v4l2_buf.m.planes[0].m.fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
 			if (ctx->dec->capture_plane.qBuffer(v4l2_buf, NULL) < 0){
 				ERROR_MSG("Error while queueing buffer at decoder capture plane");
 			}
 		}
-
 	}
+
+	// Wake all waiting threads at EOS or decoder error
+	ctx->has_frame_cv->notify_all();
 }
 
 nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
@@ -368,6 +374,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 	ctx->frame_size[0]=0;
 	ctx->frame_pools=new std::queue<int>;
 	ctx->mutex = new std::mutex();
+	ctx->has_frame_cv = new std::condition_variable();
 	for(int index=0;index<MAX_BUFFERS;index++)
 		ctx->dmaBufferFileDescriptor[index]=0;
 	for(int index=0;index<MAX_BUFFERS;index++){
@@ -444,13 +451,21 @@ int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 }
 
 
-int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame){
+int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame,bool wait){
 	
 	int ret,picture_index;
+	std::unique_lock<std::mutex> lock(*ctx->mutex);
 
-	if(ctx->frame_pools->empty()){
+	if (wait) {
+		while (ctx->frame_pools->empty() && !ctx->eos && !ctx->dec->isInError()) {
+			ctx->has_frame_cv->wait(lock);
+		}
+	}
+
+	if (ctx->frame_pools->empty()) {
 		return -1;
 	}
+
 	picture_index=ctx->frame_pools->front();
 	ctx->frame_pools->pop();
 
@@ -513,6 +528,7 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	}
 
 	delete ctx->mutex; ctx->mutex = nullptr;
+	delete ctx->has_frame_cv; ctx->has_frame_cv = nullptr;
 	delete ctx->frame_pools; ctx->frame_pools = nullptr;
 
 	delete ctx; ctx = nullptr;
