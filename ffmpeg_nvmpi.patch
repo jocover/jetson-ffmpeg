@@ -300,12 +300,13 @@ index 0000000..1d92aeb
 +	ptrs[1]=_nvframe.payload[1];
 +	ptrs[2]=_nvframe.payload[2];
 +
-+	av_image_copy(frame->data, frame->linesize, (const uint8_t **) ptrs, linesize, avctx->pix_fmt, _nvframe.width,_nvframe.height);
++  frame->format=avctx->pix_fmt;
++
++	av_image_copy(frame->data, frame->linesize, (const uint8_t **) ptrs, linesize, frame->format, _nvframe.width,_nvframe.height);
 +
 +	frame->width=_nvframe.width;
 +	frame->height=_nvframe.height;
 +
-+	frame->format=AV_PIX_FMT_YUV420P;
 +	frame->pts=_nvframe.timestamp;
 +	frame->pkt_dts = AV_NOPTS_VALUE;
 +
