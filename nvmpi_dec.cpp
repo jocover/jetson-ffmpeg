@@ -273,12 +273,12 @@ void *dec_capture_loop_fcn(void *arg){
 				}
 
 
-				ctx->frame_linesize[0]=parm.width[0];
+				ctx->frame_linesize[0]=parm.pitch[0];
 				ctx->frame_size[0]=parm.psize[0];
 
-				ctx->frame_linesize[1]=parm.width[1];
+				ctx->frame_linesize[1]=parm.pitch[1];
 				ctx->frame_size[1]=parm.psize[1];
-				ctx->frame_linesize[2]=parm.width[2];
+				ctx->frame_linesize[2]=parm.pitch[2];
 				ctx->frame_size[2]=parm.psize[2];
 
 
