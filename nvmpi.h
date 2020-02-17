@@ -1,6 +1,7 @@
 #ifndef __NVMPI_H__
 #define __NVMPI_H__
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct nvmpictx nvmpictx;
 
@@ -70,7 +71,7 @@ extern "C" {
 
 	int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet);
 
-	int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame);
+	int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame,bool wait);
 
 	int nvmpi_decoder_close(nvmpictx* ctx);
 

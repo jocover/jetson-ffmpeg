@@ -184,7 +184,7 @@ index d2f9a39..04dc62b 100644
  
 diff --git a/libavcodec/nvmpi_dec.c b/libavcodec/nvmpi_dec.c
 new file mode 100644
-index 0000000..1d92aeb
+index 0000000..694195c
 --- /dev/null
 +++ b/libavcodec/nvmpi_dec.c
 @@ -0,0 +1,166 @@
@@ -281,7 +281,7 @@ index 0000000..1d92aeb
 +		res=nvmpi_decoder_put_packet(nvmpi_context->ctx,&packet);
 +	}
 +
-+	res=nvmpi_decoder_get_frame(nvmpi_context->ctx,&_nvframe);
++	res=nvmpi_decoder_get_frame(nvmpi_context->ctx,&_nvframe,avctx->flags & AV_CODEC_FLAG_LOW_DELAY);
 +
 +	if(res<0)
 +		return avpkt->size;
