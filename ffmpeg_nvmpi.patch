@@ -1,5 +1,5 @@
 diff --git a/configure b/configure
-index 34c2adb..7890937 100755
+index 34c2adb..a861a73 100755
 --- a/configure
 +++ b/configure
 @@ -340,6 +340,7 @@ External library support:
@@ -10,14 +10,14 @@ index 34c2adb..7890937 100755
  
  Toolchain options:
    --arch=ARCH              select architecture [$arch]
-@@ -1831,6 +1832,7 @@ HWACCEL_AUTODETECT_LIBRARY_LIST="
-     videotoolbox
-     v4l2_m2m
-     xvmc
+@@ -1851,6 +1852,7 @@ HWACCEL_LIBRARY_LIST="
+     mmal
+     omx
+     opencl
 +    nvmpi
  "
  
- # catchall list of things that require external libs to link
+ DOCUMENT_LIST="
 @@ -3014,11 +3016,14 @@ h264_mediacodec_decoder_deps="mediacodec"
  h264_mediacodec_decoder_select="h264_mp4toannexb_bsf h264_parser"
  h264_mmal_decoder_deps="mmal"
