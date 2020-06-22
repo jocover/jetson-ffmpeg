@@ -85,7 +85,7 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 	ctx->packets_size[ctx->buf_index]=buffer->planes[0].bytesused;
 	memcpy(ctx->packets[ctx->buf_index],buffer->planes[0].data,buffer->planes[0].bytesused);
 
-	ctx->timestamp[ctx->buf_index]=v4l2_buf->timestamp.tv_usec;
+	ctx->timestamp[ctx->buf_index] = (v4l2_buf->timestamp.tv_usec % 1000000) + (v4l2_buf->timestamp.tv_sec * 1000000UL);
 
 	ctx->packet_pools->push(ctx->buf_index);
 
@@ -412,8 +412,8 @@ int nvmpi_encoder_put_frame(nvmpictx* ctx,nvFrame* frame){
 	nvBuffer->planes[2].bytesused=frame->payload_size[2];
 
 	v4l2_buf.flags |= V4L2_BUF_FLAG_TIMESTAMP_COPY;
-	v4l2_buf.timestamp.tv_usec = frame->timestamp;
-
+	v4l2_buf.timestamp.tv_usec = frame->timestamp % 1000000;
+	v4l2_buf.timestamp.tv_sec = frame->timestamp / 1000000;
 
 	ret = ctx->enc->output_plane.qBuffer(v4l2_buf, NULL);
 	TEST_ERROR(ret < 0, "Error while queueing buffer at output plane", ret);
@@ -429,14 +429,22 @@ int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet){
 		return -1;
 
 	packet_index= ctx->packet_pools->front();
-	ctx->packet_pools->pop();
+
+	auto ts = ctx->timestamp[packet_index];
+	auto size = ctx->packets_size[packet_index];
+	if((ts > 0) && (size == 0)) // Old packet, but 0-0 skip!
+	{
+		return -1;
+	}
 
 	packet->payload=ctx->packets[packet_index];
-	packet->pts=ctx->timestamp[packet_index];
-	packet->payload_size=ctx->packets_size[packet_index];
+	packet->pts=ts;
+
+	packet->payload_size=size;
 	if(ctx->packets_keyflag[packet_index])
 		packet->flags|= 0x0001;//AV_PKT_FLAG_KEY 0x0001
-
+	ctx->packets_size[packet_index] = 0; // mark as readed
+	ctx->packet_pools->pop();
 	return 0;
 }
 
