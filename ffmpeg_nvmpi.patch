@@ -182,7 +182,7 @@ diff -Naur ffmpeg/libavcodec/allcodecs.c ffmpeg2/libavcodec/allcodecs.c
 diff -Naur ffmpeg/libavcodec/nvmpi_dec.c ffmpeg2/libavcodec/nvmpi_dec.c
 --- ffmpeg/libavcodec/nvmpi_dec.c	1969-12-31 16:00:00.000000000 -0800
 +++ ffmpeg2/libavcodec/nvmpi_dec.c	2021-01-25 15:28:29.327551173 -0800
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,169 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <sys/time.h>
