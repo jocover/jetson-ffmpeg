@@ -239,12 +239,12 @@ index 0000000..f82aa61
 +	}
 +
 +	//Workaround for default pix_fmt not being set, so check if it isnt set and set it,
-+   //or if it is set, but isnt set to something we can work with.
++	//or if it is set, but isnt set to something we can work with.
 +
 +	if(avctx->pix_fmt ==AV_PIX_FMT_NONE){
 +		 avctx->pix_fmt=AV_PIX_FMT_YUV420P;
-+	}else if(avctx-> pix_fmt != AV_PIX_FMT_YUV420P){
-+		av_log(avctx, AV_LOG_ERROR, "Invalid Pix_FMT for NVMPI Only yuv420p is supported\n");
++	}else if((avctx->pix_fmt != AV_PIX_FMT_YUV420P) && (avctx->pix_fmt != AV_PIX_FMT_YUVJ420P)){
++		av_log(avctx, AV_LOG_ERROR, "Invalid Pix_FMT for NVMPI: Only YUV420P and YUVJ420P are supported\n");
 +		return AVERROR_INVALIDDATA;
 +	}
 +
