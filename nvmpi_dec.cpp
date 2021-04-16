@@ -494,9 +494,10 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	ctx->mutex->lock();
 	ctx->eos=true;
 	ctx->mutex->unlock();
-	
+
+	ctx->dec->output_plane.setStreamStatus(false);
 	ctx->dec->capture_plane.setStreamStatus(false);
-	
+
 	if (ctx->dec_capture_loop) {
 		ctx->dec_capture_loop->join();
 		delete ctx->dec_capture_loop;
@@ -512,13 +513,13 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
 	{
 		if (ctx->dmaBufferFileDescriptor[index] != 0)
-		{	
+		{
 			int ret = NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
 			TEST_ERROR(ret < 0, "Failed to Destroy NvBuffer", ret);
 		}
 
 	}
-	
+
 	delete ctx->dec; ctx->dec = nullptr;
 
 	for(int index=0;index<MAX_BUFFERS;index++){

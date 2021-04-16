@@ -467,11 +467,15 @@ int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet){
 }
 
 int nvmpi_encoder_close(nvmpictx* ctx){
-
+	ctx->enc->output_plane.setStreamStatus(false);
+	ctx->enc->capture_plane.setStreamStatus(false);
 	ctx->enc->capture_plane.stopDQThread();
 	ctx->enc->capture_plane.waitForDQThread(1000);
 	delete ctx->enc;
 	delete ctx->packet_pools;
+	for(int index=0;index<MAX_BUFFERS;index++){
+		delete [] ctx->packets[index];
+	}
 	delete ctx;
 }
 
