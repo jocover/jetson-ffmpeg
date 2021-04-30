@@ -113,7 +113,6 @@ static bool encoder_capture_plane_dq_callback(struct v4l2_buffer *v4l2_buf, NvBu
 nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 
 	int ret;
-
 	log_level = LOG_LEVEL_INFO;
 	nvmpictx *ctx=new nvmpictx;
 	ctx->index=0;
@@ -374,26 +373,6 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	return ctx;
 }
 
-static void copy_image_plane(unsigned char* dst, const unsigned char* src, int dstPitch, int srcPitch, int height, uint32_t* byteCopied)
-{
-    if(!dst || !src){
-        return;
-    }
-    if(dstPitch == srcPitch){
-        *byteCopied = srcPitch * height;
-        memcpy(dst, src, *byteCopied);
-    }
-    else{
-        int pitch = min(dstPitch, srcPitch);
-        *byteCopied = 0;
-        for(int i = 0; i < height; i++){
-            memcpy(dst, src, pitch);
-            dst += dstPitch;
-            src += srcPitch;
-            *byteCopied += pitch;
-        }
-    }
-}
 
 int nvmpi_encoder_put_frame(nvmpictx* ctx,nvFrame* frame){
 	int ret;
@@ -425,9 +404,12 @@ int nvmpi_encoder_put_frame(nvmpictx* ctx,nvFrame* frame){
 
 	}
 
-	copy_image_plane(nvBuffer->planes[0].data, frame->payload[0], nvBuffer->planes[0].fmt.stride, frame->linesize[0], frame->height, &nvBuffer->planes[0].bytesused);
-	copy_image_plane(nvBuffer->planes[1].data, frame->payload[1], nvBuffer->planes[1].fmt.stride, frame->linesize[1], frame->height >> 1, &nvBuffer->planes[1].bytesused);
-	copy_image_plane(nvBuffer->planes[2].data, frame->payload[2], nvBuffer->planes[2].fmt.stride, frame->linesize[2], frame->height >> 1, &nvBuffer->planes[2].bytesused);
+	memcpy(nvBuffer->planes[0].data,frame->payload[0],frame->payload_size[0]);
+	memcpy(nvBuffer->planes[1].data,frame->payload[1],frame->payload_size[1]);
+	memcpy(nvBuffer->planes[2].data,frame->payload[2],frame->payload_size[2]);
+	nvBuffer->planes[0].bytesused=frame->payload_size[0];
+	nvBuffer->planes[1].bytesused=frame->payload_size[1];
+	nvBuffer->planes[2].bytesused=frame->payload_size[2];
 
 	v4l2_buf.flags |= V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	v4l2_buf.timestamp.tv_usec = frame->timestamp % 1000000;
