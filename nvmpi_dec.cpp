@@ -282,6 +282,9 @@ void *dec_capture_loop_fcn(void *arg){
 				ctx->frame_size[1]=parm.psize[1];
 				ctx->frame_linesize[2]=parm.width[2];
 				ctx->frame_size[2]=parm.psize[2];
+				
+				if (ctx->out_pixfmt==NV_PIX_NV12)
+					ctx->frame_linesize[1] *= 2;
 
 
 				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[buf_index]);
