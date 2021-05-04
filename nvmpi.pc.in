@@ -7,6 +7,6 @@ Name: @PROJECT_NAME@
 Description: @PROJECT_DESCRIPTION@
 Version: @PROJECT_VERSION@
 
-Requires:
+Requires: libv4l2
 Libs: -L${libdir} -lnvmpi
 Cflags: -I${includedir} 
