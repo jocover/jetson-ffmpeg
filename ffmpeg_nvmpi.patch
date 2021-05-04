@@ -248,7 +248,7 @@ index 0000000..f82aa61
 +		return AVERROR_INVALIDDATA;
 +	}
 +
-+	nvmpi_context->ctx=nvmpi_create_decoder(codectype,NV_PIX_YUV420);
++	nvmpi_context->ctx=nvmpi_create_decoder(codectype,avctx->pix_fmt == AV_PIX_FMT_NV12 ? NV_PIX_NV12 : NV_PIX_YUV420);
 +
 +	if(!nvmpi_context->ctx){
 +		av_log(avctx, AV_LOG_ERROR, "Failed to nvmpi_create_decoder (code = %d).\n", AVERROR_EXTERNAL);
