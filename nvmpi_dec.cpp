@@ -197,6 +197,8 @@ void *dec_capture_loop_fcn(void *arg){
 	struct v4l2_crop v4l2Crop;
 	struct v4l2_event v4l2Event;
 	int ret,buf_index=0;
+	NvBufferSession session;
+	session = NvBufferSessionCreate();
 
 	while (!(ctx->dec->isInError()||ctx->eos)){
 		NvBuffer *dec_buffer;
@@ -252,6 +254,7 @@ void *dec_capture_loop_fcn(void *arg){
 			transform_params.transform_flag = NVBUFFER_TRANSFORM_FILTER;
 			transform_params.transform_flip = NvBufferTransform_None;
 			transform_params.transform_filter = NvBufferTransform_Filter_Smart;
+			transform_params.session = session;
 			transform_params.src_rect = src_rect;
 			transform_params.dst_rect = dest_rect;
 
@@ -310,7 +313,7 @@ void *dec_capture_loop_fcn(void *arg){
 			}
 		}
 	}
-
+	NvBufferSessionDestroy(session);
 	// Wake all waiting threads at EOS or decoder error
 	ctx->has_frame_cv->notify_all();
 }
