@@ -195,7 +195,10 @@ bool isJetpack44Installed(){
 	}
 
 	//wait for the child process to terminate
-	waitpid(pid, &status, WNOHANG);
+	if(waitpid(pid, &status, WNOHANG) == -1){
+		close(pipefd[0]);
+		return false;
+	}
 	output = fdopen(pipefd[0], "r");
 	if(!output){
 		close(pipefd[0]);
