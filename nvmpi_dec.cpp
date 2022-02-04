@@ -9,6 +9,9 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 #define CHUNK_SIZE 4000000
 #define MAX_BUFFERS 32
@@ -20,6 +23,123 @@
 }
 
 using namespace std;
+
+// redefined NvBufferColorFormat
+enum
+{
+  /** BT.601 colorspace - YUV420 multi-planar. */
+  _NvBufferColorFormat_YUV420,
+  /** BT.601 colorspace - YUV420 multi-planar. */
+  _NvBufferColorFormat_YVU420,
+  /** BT.601 colorspace - YUV422 multi-planar. */
+  _NvBufferColorFormat_YUV422,
+  /** BT.601 colorspace - YUV420 ER multi-planar. */
+  _NvBufferColorFormat_YUV420_ER,
+  /** BT.601 colorspace - YVU420 ER multi-planar. */
+  _NvBufferColorFormat_YVU420_ER,
+  /** BT.601 colorspace - Y/CbCr 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV12,
+  /** BT.601 colorspace - Y/CbCr ER 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV12_ER,
+  /** BT.601 colorspace - Y/CbCr 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV21,
+  /** BT.601 colorspace - Y/CbCr ER 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV21_ER,
+  /** BT.601 colorspace - YUV 4:2:2 planar. */
+  _NvBufferColorFormat_UYVY,
+  /** BT.601 colorspace - YUV ER 4:2:2 planar. */
+  _NvBufferColorFormat_UYVY_ER,
+  /** BT.601 colorspace - YUV 4:2:2 planar. */
+  _NvBufferColorFormat_VYUY,
+  /** BT.601 colorspace - YUV ER 4:2:2 planar. */
+  _NvBufferColorFormat_VYUY_ER,
+  /** BT.601 colorspace - YUV 4:2:2 planar. */
+  _NvBufferColorFormat_YUYV,
+  /** BT.601 colorspace - YUV ER 4:2:2 planar. */
+  _NvBufferColorFormat_YUYV_ER,
+  /** BT.601 colorspace - YUV 4:2:2 planar. */
+  _NvBufferColorFormat_YVYU,
+  /** BT.601 colorspace - YUV ER 4:2:2 planar. */
+  _NvBufferColorFormat_YVYU_ER,
+  /** LegacyRGBA colorspace - BGRA-8-8-8-8 planar. */
+  _NvBufferColorFormat_ABGR32,
+  /** LegacyRGBA colorspace - XRGB-8-8-8-8 planar. */
+  _NvBufferColorFormat_XRGB32,
+  /** LegacyRGBA colorspace - ARGB-8-8-8-8 planar. */
+  _NvBufferColorFormat_ARGB32,
+  /** BT.601 colorspace - Y/CbCr 4:2:0 10-bit multi-planar. */
+  _NvBufferColorFormat_NV12_10LE,
+  /** BT.709 colorspace - Y/CbCr 4:2:0 10-bit multi-planar. */
+  _NvBufferColorFormat_NV12_10LE_709,
+  /** BT.709_ER colorspace - Y/CbCr 4:2:0 10-bit multi-planar. */
+  _NvBufferColorFormat_NV12_10LE_709_ER,
+  /** BT.2020 colorspace - Y/CbCr 4:2:0 10-bit multi-planar. */
+  _NvBufferColorFormat_NV12_10LE_2020,
+  /** BT.601 colorspace - Y/CrCb 4:2:0 10-bit multi-planar. */
+  _NvBufferColorFormat_NV21_10LE,
+  /** BT.601 colorspace - Y/CbCr 4:2:0 12-bit multi-planar. */
+  _NvBufferColorFormat_NV12_12LE,
+  /** BT.2020 colorspace - Y/CbCr 4:2:0 12-bit multi-planar. */
+  _NvBufferColorFormat_NV12_12LE_2020,
+  /** BT.601 colorspace - Y/CrCb 4:2:0 12-bit multi-planar. */
+  _NvBufferColorFormat_NV21_12LE,
+  /** BT.709 colorspace - YUV420 multi-planar. */
+  _NvBufferColorFormat_YUV420_709,
+  /** BT.709 colorspace - YUV420 ER multi-planar. */
+  _NvBufferColorFormat_YUV420_709_ER,
+  /** BT.709 colorspace - Y/CbCr 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV12_709,
+  /** BT.709 colorspace - Y/CbCr ER 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV12_709_ER,
+  /** BT.2020 colorspace - YUV420 multi-planar. */
+  _NvBufferColorFormat_YUV420_2020,
+  /** BT.2020 colorspace - Y/CbCr 4:2:0 multi-planar. */
+  _NvBufferColorFormat_NV12_2020,
+  /** Optical flow */
+  _NvBufferColorFormat_SignedR16G16,
+  /** Optical flow SAD calculation Buffer format */
+  _NvBufferColorFormat_A32,
+  /** BT.601 colorspace - YUV444 multi-planar. */
+  _NvBufferColorFormat_YUV444,
+  /** 8-bit grayscale. */
+  _NvBufferColorFormat_GRAY8,
+  /** BT.601 colorspace - Y/CbCr 4:2:2 multi-planar. */
+  _NvBufferColorFormat_NV16,
+    /** BT.601 colorspace - Y/CbCr 4:2:2 10-bit semi-planar. */
+  _NvBufferColorFormat_NV16_10LE,
+  /** BT.601 colorspace - Y/CbCr 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24,
+  /** BT.601_ER colorspace - Y/CbCr 4:2:2 multi-planar. */
+  _NvBufferColorFormat_NV16_ER,
+  /** BT.601_ER colorspace - Y/CbCr 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_ER,
+  /** BT.709 colorspace - Y/CbCr 4:2:2 multi-planar. */
+  _NvBufferColorFormat_NV16_709,
+  /** BT.709 colorspace - Y/CbCr 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_709,
+  /** BT.709_ER colorspace - Y/CbCr 4:2:2 multi-planar. */
+  _NvBufferColorFormat_NV16_709_ER,
+  /** BT.709_ER colorspace - Y/CbCr 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_709_ER,
+  /** BT.709 colorspace - Y/CbCr 10 bit 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_10LE_709,
+  /** BT.709 ER colorspace - Y/CbCr 10 bit 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_10LE_709_ER,
+  /** BT.2020 colorspace - Y/CbCr 10 bit 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_10LE_2020,
+  /** BT.2020 colorspace - Y/CbCr 12 bit 4:4:4 multi-planar. */
+  _NvBufferColorFormat_NV24_12LE_2020,
+  /** Non-linear RGB BT.709 colorspace - RGBA-10-10-10-2 planar. */
+  _NvBufferColorFormat_RGBA_10_10_10_2_709,
+  /** Non-linear RGB BT.2020 colorspace - RGBA-10-10-10-2 planar. */
+  _NvBufferColorFormat_RGBA_10_10_10_2_2020,
+  /** Non-linear RGB BT.709 colorspace - BGRA-10-10-10-2 planar. */
+  _NvBufferColorFormat_BGRA_10_10_10_2_709,
+  /** Non-linear RGB BT.2020 colorspace - BGRA-10-10-10-2 planar. */
+  _NvBufferColorFormat_BGRA_10_10_10_2_2020,
+  /** Invalid color format. */
+  _NvBufferColorFormat_Invalid,
+};
 
 struct nvmpictx
 {
@@ -44,7 +164,54 @@ struct nvmpictx
 	unsigned int frame_size[MAX_NUM_PLANES];
 	unsigned int frame_linesize[MAX_NUM_PLANES];
 	unsigned long long timestamp[MAX_BUFFERS];
+	bool isJetpack44{false};
 };
+
+bool isJetpack44Installed(){
+	pid_t pid = 0;
+	int pipefd[2];
+	FILE* output;
+	char line[256];
+	int status;
+	std::string version;
+
+	if(pipe2(pipefd, O_CLOEXEC) == -1){ //create a pipe
+		return false;
+	}
+	pid = fork(); //span a child process
+	if(pid == 0){
+		// Child. Let's redirect its standard output to our pipe and replace process with dpkg-query
+		close(pipefd[0]);
+		dup2(pipefd[1], STDOUT_FILENO);
+		dup2(pipefd[1], STDERR_FILENO);
+		execl("/usr/bin/dpkg-query", "/usr/bin/dpkg-query", "--showformat='${version}'", "--show", "nvidia-l4t-multimedia-utils", (char*) NULL);
+	}
+
+	//Only parent gets here. Listen to what the dpkg-query says
+	close(pipefd[1]);
+	if(pid == -1){
+		close(pipefd[0]);
+		return false;
+	}
+
+	//wait for the child process to terminate
+	if(waitpid(pid, &status, WNOHANG) == -1){
+		close(pipefd[0]);
+		return false;
+	}
+	output = fdopen(pipefd[0], "r");
+	if(!output){
+		close(pipefd[0]);
+		return false;
+	}
+
+	while(fgets(line, sizeof(line), output)){ //listen to what dpkg-query writes to its standard output
+		version += line;
+	}
+	fclose(output);
+	std::cout << "nvidia-l4t-multimedia-utils deb package version: " << version << std::endl;
+	return !version.compare(1, 4,"32.4", 4);
+}
 
 void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx){
 	
@@ -72,7 +239,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 	input_params.width = crop.c.width;
 	input_params.height = crop.c.height;
 	input_params.layout = NvBufferLayout_Pitch;
-	input_params.colorFormat = ctx->out_pixfmt==NV_PIX_NV12?NvBufferColorFormat_NV12: NvBufferColorFormat_YUV420;
+	input_params.colorFormat = ctx->out_pixfmt==NV_PIX_NV12?(NvBufferColorFormat)_NvBufferColorFormat_NV12: (NvBufferColorFormat)_NvBufferColorFormat_YUV420;
 	input_params.nvbuf_tag = NvBufferTag_VIDEO_DEC;
 
 	ctx->dec->capture_plane.deinitPlane();
@@ -87,7 +254,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 	}
 
-
 	ret=ctx->dec->setCapturePlaneFormat(format.fmt.pix_mp.pixelformat,format.fmt.pix_mp.width,format.fmt.pix_mp.height);
 	TEST_ERROR(ret < 0, "Error in setting decoder capture plane format", ret);
 
@@ -96,55 +262,60 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 	ctx->numberCaptureBuffers = minimumDecoderCaptureBuffers + 5;
 
-
-
 	switch (format.fmt.pix_mp.colorspace)
 	{
 		case V4L2_COLORSPACE_SMPTE170M:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 				// "Decoder colorspace ITU-R BT.601 with standard range luma (16-235)"
-				cParams.colorFormat = NvBufferColorFormat_NV12;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12;
 			}
 			else
 			{
 				//"Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_ER;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12_ER;
 			}
 			break;
 		case V4L2_COLORSPACE_REC709:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 				//"Decoder colorspace ITU-R BT.709 with standard range luma (16-235)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_709;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12_709;
 			}
 			else
 			{
 				//"Decoder colorspace ITU-R BT.709 with extended range luma (0-255)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_709_ER;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12_709_ER;
 			}
 			break;
 		case V4L2_COLORSPACE_BT2020:
 			{
 				//"Decoder colorspace ITU-R BT.2020";
-				cParams.colorFormat = NvBufferColorFormat_NV12_2020;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12_2020;
 			}
 			break;
 		default:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 				//"Decoder colorspace ITU-R BT.601 with standard range luma (16-235)";
-				cParams.colorFormat = NvBufferColorFormat_NV12;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12;
 			}
 			else
 			{
 				//"Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_ER;
+				cParams.colorFormat = (NvBufferColorFormat)_NvBufferColorFormat_NV12_ER;
 			}
 			break;
 	}
 
-
+	if(ctx->isJetpack44){
+		if(input_params.colorFormat > (NvBufferColorFormat)_NvBufferColorFormat_YVU420){
+			input_params.colorFormat = (NvBufferColorFormat)((int)input_params.colorFormat - 1);
+		}
+		if(cParams.colorFormat > (NvBufferColorFormat)_NvBufferColorFormat_YVU420){
+			cParams.colorFormat = (NvBufferColorFormat)((int)cParams.colorFormat - 1);
+		}
+	}
 
 	ret = NvBufferCreateEx (&ctx->dst_dma_fd, &input_params);
 	TEST_ERROR(ret == -1, "create dst_dmabuf failed", error);
@@ -159,7 +330,6 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 		ret = NvBufferCreateEx(&ctx->dmaBufferFileDescriptor[index], &cParams);
 		TEST_ERROR(ret < 0, "Failed to create buffers", ret);
-
 	}	
 
 	ctx->dec->capture_plane.reqbufs(V4L2_MEMORY_DMABUF, ctx->numberCaptureBuffers);
@@ -322,6 +492,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 
 	nvmpictx* ctx=new nvmpictx;
 
+	ctx->isJetpack44 = isJetpack44Installed();
 	ctx->dec = NvVideoDecoder::createVideoDecoder("dec0");
 	TEST_ERROR(!ctx->dec, "Could not create decoder",ret);
 
@@ -494,9 +665,10 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	ctx->mutex->lock();
 	ctx->eos=true;
 	ctx->mutex->unlock();
-	
+
+	ctx->dec->output_plane.setStreamStatus(false);
 	ctx->dec->capture_plane.setStreamStatus(false);
-	
+
 	if (ctx->dec_capture_loop) {
 		ctx->dec_capture_loop->join();
 		delete ctx->dec_capture_loop;
@@ -512,13 +684,13 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
 	{
 		if (ctx->dmaBufferFileDescriptor[index] != 0)
-		{	
+		{
 			int ret = NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
 			TEST_ERROR(ret < 0, "Failed to Destroy NvBuffer", ret);
 		}
 
 	}
-	
+
 	delete ctx->dec; ctx->dec = nullptr;
 
 	for(int index=0;index<MAX_BUFFERS;index++){

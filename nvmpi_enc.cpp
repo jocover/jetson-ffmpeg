@@ -43,6 +43,7 @@ struct nvmpictx{
 	uint32_t num_b_frames;
 	uint32_t num_reference_frames;
 	bool insert_sps_pps_at_idr;
+	bool insert_vui;
 
 	uint32_t packets_buf_size;
 	uint32_t packets_num;
@@ -133,7 +134,7 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 	ctx->qmin=param->qmin;
 	ctx->num_b_frames=param->max_b_frames;
 	ctx->num_reference_frames=param->refs;
-	ctx->insert_sps_pps_at_idr=(param->insert_spspps_idr==1)?true:false;
+	ctx->insert_sps_pps_at_idr = ctx->insert_vui = (param->insert_spspps_idr==1)?true:false;
 
 	switch(param->profile){
 		case 77://FF_PROFILE_H264_MAIN
@@ -332,6 +333,11 @@ nvmpictx* nvmpi_create_encoder(nvCodingType codingType,nvEncParam * param){
 		TEST_ERROR(ret < 0, "Could not set insertSPSPPSAtIDR", ret);
 	}
 
+	if(ctx->insert_vui){
+		ret = ctx->enc->setInsertVuiEnabled(true);
+		TEST_ERROR(ret < 0, "Could not set encoder insert-vui enabled", ret);
+	}
+
 	ret = ctx->enc->setFrameRate(ctx->fps_n, ctx->fps_d);
 	TEST_ERROR(ret < 0, "Could not set framerate", ret);
 
@@ -449,11 +455,15 @@ int nvmpi_encoder_get_packet(nvmpictx* ctx,nvPacket* packet){
 }
 
 int nvmpi_encoder_close(nvmpictx* ctx){
-
+	ctx->enc->output_plane.setStreamStatus(false);
+	ctx->enc->capture_plane.setStreamStatus(false);
 	ctx->enc->capture_plane.stopDQThread();
 	ctx->enc->capture_plane.waitForDQThread(1000);
 	delete ctx->enc;
 	delete ctx->packet_pools;
+	for(int index=0;index<MAX_BUFFERS;index++){
+		delete [] ctx->packets[index];
+	}
 	delete ctx;
 }
 
