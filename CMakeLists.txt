@@ -1,62 +1,77 @@
 cmake_minimum_required(VERSION 3.9)
 project(nvmpi VERSION 1.0.0 DESCRIPTION "nvidia multimedia api")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_FLAGS“$ {CMAKE_C_FLAGS} -fPIC”)
 set(CMAKE_CXX_FLAGS“$ {CMAKE_CXX_FLAGS} -fPIC”)
-#set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath-link=/lib")
-#set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath-link=/usr/lib/aarch64-linux-gnu")
+
+set(MMAPI_PATH /usr/src/jetson_multimedia_api/)
+
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath-link=/lib/aarch64-linux-gnu")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath-link=/usr/lib/aarch64-linux-gnu/tegra")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath-link=/usr/lib/aarch64-linux-gnu")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath-link=/usr/local/cuda/lib64")
 
-find_library(LIB_NVBUF nvbuf_utils PATHS /usr/lib/aarch64-linux-gnu/tegra)
-find_library(LIB_V4L2 nvv4l2 PATHS /usr/lib/aarch64-linux-gnu/tegra)
 find_package (Threads)
-#find_library(LIB_DRM drm PATHS /usr/lib/aarch64-linux-gnu/tegra)
-#find_library(LIB_EGL EGL PATHS /usr/lib/aarch64-linux-gnu/tegra)
 
+# file(GLOB MMAPI_SRC "${MMAPI_PATH}/samples/common/classes/*.cpp")
+
+file(GLOB MMAPI_SRC
+ ${MMAPI_PATH}/samples/common/classes/NvBuffer.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvElement.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvElementProfiler.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvLogging.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvV4l2Element.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvV4l2ElementPlane.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvVideoDecoder.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvVideoEncoder.cpp
+ ${MMAPI_PATH}/samples/common/classes/NvBufSurface.cpp
+)
 add_library(nvmpi SHARED
     nvmpi_dec.cpp
     nvmpi_enc.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvBuffer.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvElement.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvElementProfiler.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvLogging.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvV4l2Element.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvV4l2ElementPlane.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvVideoDecoder.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvVideoEncoder.cpp
-    #common/NvVideoConverter.cpp
-    #common/NvApplicationProfiler.cpp
-    #common/NvEglRenderer.cpp
-    #common/NvUtils.cpp
-)
+    ${MMAPI_SRC}
+  )
 
 add_library(nvmpi_static STATIC
     nvmpi_dec.cpp
     nvmpi_enc.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvBuffer.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvElement.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvElementProfiler.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvLogging.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvV4l2Element.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvV4l2ElementPlane.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvVideoDecoder.cpp
-    /usr/src/jetson_multimedia_api/samples/common/classes/NvVideoEncoder.cpp
-    #common/NvVideoConverter.cpp
-    #common/NvApplicationProfiler.cpp
-    #common/NvEglRenderer.cpp
-    #common/NvUtils.cpp
+    ${MMAPI_SRC}
 )
+
+set(LIBS nvv4l2 nvbufsurface nvbufsurftransform)
+foreach(LIB ${LIBS})
+  find_library(LIB_${LIB} ${LIB} PATHS /usr/lib/aarch64-linux-gnu/tegra)
+  if(LIB_${LIB})
+    target_link_libraries(nvmpi PRIVATE ${LIB_${LIB}})
+    target_link_libraries(nvmpi_static PRIVATE ${LIB_${LIB}})
+  else()
+    message("Could not find LIB_${LIB}")
+  endif()
+endforeach()
+
 
 set_target_properties(nvmpi_static PROPERTIES OUTPUT_NAME nvmpi)
 set_target_properties(nvmpi PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(nvmpi PROPERTIES SOVERSION 1)
 set_target_properties(nvmpi nvmpi_static PROPERTIES PUBLIC_HEADER nvmpi.h)
-target_link_libraries(nvmpi PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${LIB_NVBUF}  ${LIB_V4L2})
-target_include_directories(nvmpi PRIVATE /usr/src/jetson_multimedia_api/include)
-target_include_directories(nvmpi PRIVATE /usr/local/cuda/include)
-target_include_directories(nvmpi_static PRIVATE /usr/src/jetson_multimedia_api/include)
-target_include_directories(nvmpi_static PRIVATE /usr/local/cuda/include)
+target_link_libraries(nvmpi PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${LIB_V4L2} ${LIB_NVBS} ${LIB_NVBST})
+target_include_directories(nvmpi PRIVATE
+  ${MMAPI_PATH}/include
+  ${MMAPI_PATH}/include/libjpeg-8b
+)
+target_include_directories(nvmpi PRIVATE
+  /usr/local/cuda/include
+  /usr/include/libdrm
+)
+target_include_directories(nvmpi_static PRIVATE
+  ${MMAPI_PATH}/include
+  ${MMAPI_PATH}/include/libjpeg-8b
+)
+target_include_directories(nvmpi_static PRIVATE
+  /usr/local/cuda/include
+  /usr/include/libdrm
+)
 configure_file(nvmpi.pc.in nvmpi.pc @ONLY)
 include(GNUInstallDirs)
 install(TARGETS nvmpi nvmpi_static

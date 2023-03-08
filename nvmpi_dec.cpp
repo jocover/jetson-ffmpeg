@@ -1,7 +1,9 @@
-
 #include "nvmpi.h"
 #include "NvVideoDecoder.h"
-#include "nvbuf_utils.h"
+
+#include "nvbufsurface.h"
+#include "nvbufsurftransform.h"
+#include "NvBufSurface.h"
 #include <vector>
 #include <iostream>
 #include <thread>
@@ -41,19 +43,18 @@ struct nvmpictx
 	unsigned char * bufptr_0[MAX_BUFFERS];
 	unsigned char * bufptr_1[MAX_BUFFERS];
 	unsigned char * bufptr_2[MAX_BUFFERS];
-	unsigned int frame_size[MAX_NUM_PLANES];
-	unsigned int frame_linesize[MAX_NUM_PLANES];
+	unsigned int frame_size[NVBUF_MAX_PLANES];
+	unsigned int frame_linesize[NVBUF_MAX_PLANES];
 	unsigned long long timestamp[MAX_BUFFERS];
 };
 
 void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx){
-	
 	int32_t minimumDecoderCaptureBuffers;
 	int ret=0;
-	NvBufferCreateParams input_params = {0};
-	NvBufferCreateParams cParams = {0};
+        NvBufSurf::NvCommonAllocateParams params = {0};
+	NvBufSurf::NvCommonAllocateParams capParams = {0};
 
-	ret = ctx->dec->capture_plane.getFormat(format);	
+	ret = ctx->dec->capture_plane.getFormat(format);
 	TEST_ERROR(ret < 0, "Error: Could not get format from decoder capture plane", ret);
 
 	ret = ctx->dec->capture_plane.getCrop(crop);
@@ -64,24 +65,24 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 	if(ctx->dst_dma_fd != -1)
 	{
-		NvBufferDestroy(ctx->dst_dma_fd);
-		ctx->dst_dma_fd = -1;
+        	ret = NvBufSurf::NvDestroy(ctx->dst_dma_fd);
+        	ctx->dst_dma_fd = -1;
 	}
 
-	input_params.payloadType = NvBufferPayload_SurfArray;
-	input_params.width = crop.c.width;
-	input_params.height = crop.c.height;
-	input_params.layout = NvBufferLayout_Pitch;
-	input_params.colorFormat = ctx->out_pixfmt==NV_PIX_NV12?NvBufferColorFormat_NV12: NvBufferColorFormat_YUV420;
-	input_params.nvbuf_tag = NvBufferTag_VIDEO_DEC;
+	params.memType = NVBUF_MEM_SURFACE_ARRAY;
+	params.width = crop.c.width;
+	params.height = crop.c.height;
+	params.layout = NVBUF_LAYOUT_PITCH;
+	params.colorFormat = ctx->out_pixfmt==NV_PIX_NV12?NVBUF_COLOR_FORMAT_NV12:NVBUF_COLOR_FORMAT_YUV420;
+	params.memtag = NvBufSurfaceTag_VIDEO_DEC;
 
 	ctx->dec->capture_plane.deinitPlane();
 
 	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
 	{
 		if (ctx->dmaBufferFileDescriptor[index] != 0)
-		{	
-			ret = NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
+		{
+			ret = NvBufSurf::NvDestroy(ctx->dmaBufferFileDescriptor[index]);
 			TEST_ERROR(ret < 0, "Failed to Destroy NvBuffer", ret);
 		}
 
@@ -89,6 +90,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 
 	ret=ctx->dec->setCapturePlaneFormat(format.fmt.pix_mp.pixelformat,format.fmt.pix_mp.width,format.fmt.pix_mp.height);
+        ret=ctx->dec->setMaxPerfMode(1);
 	TEST_ERROR(ret < 0, "Error in setting decoder capture plane format", ret);
 
 	ctx->dec->getMinimumCapturePlaneBuffers(minimumDecoderCaptureBuffers);
@@ -104,63 +106,59 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 				// "Decoder colorspace ITU-R BT.601 with standard range luma (16-235)"
-				cParams.colorFormat = NvBufferColorFormat_NV12;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12;
 			}
 			else
 			{
 				//"Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_ER;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12_ER;
 			}
 			break;
 		case V4L2_COLORSPACE_REC709:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 				//"Decoder colorspace ITU-R BT.709 with standard range luma (16-235)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_709;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12_709;
 			}
 			else
 			{
 				//"Decoder colorspace ITU-R BT.709 with extended range luma (0-255)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_709_ER;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12_709_ER;
 			}
 			break;
 		case V4L2_COLORSPACE_BT2020:
 			{
 				//"Decoder colorspace ITU-R BT.2020";
-				cParams.colorFormat = NvBufferColorFormat_NV12_2020;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12_2020;
 			}
 			break;
 		default:
 			if (format.fmt.pix_mp.quantization == V4L2_QUANTIZATION_DEFAULT)
 			{
 				//"Decoder colorspace ITU-R BT.601 with standard range luma (16-235)";
-				cParams.colorFormat = NvBufferColorFormat_NV12;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12;
 			}
 			else
 			{
 				//"Decoder colorspace ITU-R BT.601 with extended range luma (0-255)";
-				cParams.colorFormat = NvBufferColorFormat_NV12_ER;
+				capParams.colorFormat = NVBUF_COLOR_FORMAT_NV12_ER;
 			}
 			break;
 	}
 
 
 
-	ret = NvBufferCreateEx (&ctx->dst_dma_fd, &input_params);
-	TEST_ERROR(ret == -1, "create dst_dmabuf failed", error);
 
-	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
-	{
-		cParams.width = crop.c.width;
-		cParams.height = crop.c.height;
-		cParams.layout = NvBufferLayout_BlockLinear;
-		cParams.payloadType = NvBufferPayload_SurfArray;
-		cParams.nvbuf_tag = NvBufferTag_VIDEO_DEC;
+        ret = NvBufSurf::NvAllocate(&params, 1, &ctx->dst_dma_fd);
+        TEST_ERROR(ret == -1, "create dst_dmabuf failed", error);
 
-		ret = NvBufferCreateEx(&ctx->dmaBufferFileDescriptor[index], &cParams);
-		TEST_ERROR(ret < 0, "Failed to create buffers", ret);
-
-	}	
+        capParams.width = crop.c.width;
+        capParams.height = crop.c.height;
+        capParams.layout = NVBUF_LAYOUT_BLOCK_LINEAR;;
+        capParams.memType = NVBUF_MEM_SURFACE_ARRAY;
+        capParams.memtag = NvBufSurfaceTag_VIDEO_DEC;
+        ret = NvBufSurf::NvAllocate(&capParams, ctx->numberCaptureBuffers, ctx->dmaBufferFileDescriptor);
+	TEST_ERROR(ret < 0, "Failed to create buffers", ret);
 
 	ctx->dec->capture_plane.reqbufs(V4L2_MEMORY_DMABUF, ctx->numberCaptureBuffers);
 	TEST_ERROR(ret < 0, "Error in decoder capture plane streamon", ret);
@@ -192,7 +190,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 void *dec_capture_loop_fcn(void *arg){
 	nvmpictx* ctx=(nvmpictx*)arg;
-	
+
 	struct v4l2_format v4l2Format;
 	struct v4l2_crop v4l2Crop;
 	struct v4l2_event v4l2Event;
@@ -210,7 +208,7 @@ void *dec_capture_loop_fcn(void *arg){
 					respondToResolutionEvent(v4l2Format, v4l2Crop,ctx);
 					continue;
 			}
-		}	
+		}
 
 		if (!ctx->got_res_event) {
 			continue;
@@ -237,40 +235,52 @@ void *dec_capture_loop_fcn(void *arg){
 			}
 
 			dec_buffer->planes[0].fd = ctx->dmaBufferFileDescriptor[v4l2_buf.index];
-			NvBufferRect src_rect, dest_rect;
-			src_rect.top = 0;
-			src_rect.left = 0;
-			src_rect.width = ctx->coded_width;
-			src_rect.height = ctx->coded_height;
-			dest_rect.top = 0;
-			dest_rect.left = 0;
-			dest_rect.width = ctx->coded_width;
-			dest_rect.height = ctx->coded_height;
 
-			NvBufferTransformParams transform_params;
-			memset(&transform_params,0,sizeof(transform_params));
-			transform_params.transform_flag = NVBUFFER_TRANSFORM_FILTER;
-			transform_params.transform_flip = NvBufferTransform_None;
-			transform_params.transform_filter = NvBufferTransform_Filter_Smart;
-			transform_params.src_rect = src_rect;
-			transform_params.dst_rect = dest_rect;
+			NvBufSurf::NvCommonTransformParams transform_params;
+
+                        transform_params.src_top = 0;
+			transform_params.src_left = 0;
+			transform_params.src_width = ctx->coded_width;
+			transform_params.src_height = ctx->coded_height;
+
+			transform_params.dst_top = 0;
+			transform_params.dst_left = 0;
+			transform_params.dst_width = ctx->coded_width;
+			transform_params.dst_height = ctx->coded_height;
+
+
+			transform_params.flag = NVBUFSURF_TRANSFORM_FILTER;
+			transform_params.flip = NvBufSurfTransform_None;
+			transform_params.filter = NvBufSurfTransformInter_Algo3;
 
 			ctx->mutex->lock();
 
 			if(!ctx->eos){
-
-				ret = NvBufferTransform(dec_buffer->planes[0].fd, ctx->dst_dma_fd, &transform_params);
+                                ret = NvBufSurf::NvTransform(&transform_params, dec_buffer->planes[0].fd, ctx->dst_dma_fd);
 				TEST_ERROR(ret==-1, "Transform failed",ret);
 
-				NvBufferParams parm;
-				ret = NvBufferGetParams(ctx->dst_dma_fd, &parm);
+                                NvBufSurface* buf_surf = 0;
+                                NvBufSurfaceFromFd(ctx->dst_dma_fd, (void**)(&buf_surf));
+				NvBufSurfaceParams surParm = buf_surf->surfaceList[0];
+				NvBufSurfacePlaneParams parm = surParm.planeParams;
+
+                                // cout <<  "batchSize:" << buf_surf->batchSize << endl;
+                                // cout <<  "memType:" << buf_surf->memType << endl;
+                                // cout <<  "width:" << surParm.width << endl;
+                                // cout <<  "height:" << surParm.height << endl;
+                                // cout <<  "dataSize:" << surParm.dataSize << endl;
+                                // cout <<  "num_p:" << parm.num_planes << endl;
+                                // cout <<  "psize0:" << parm.psize[0] << endl;
+                                // cout <<  "psize1:" << parm.psize[1] << endl;
+                                // cout <<  "psize2:" << parm.psize[2] << endl;
+                                // cout <<  "bytesPerPix:" << parm.bytesPerPix << endl;
+
 
 				if(!ctx->frame_size[0]){
-
 					for(int index=0;index<MAX_BUFFERS;index++){
-						ctx->bufptr_0[index]=new unsigned char[parm.psize[0]];//Y
-						ctx->bufptr_1[index]=new unsigned char[parm.psize[1]];//UV or UU
-						ctx->bufptr_2[index]=new unsigned char[parm.psize[2]];//VV
+                                          ctx->bufptr_0[index]=new unsigned char[parm.psize[0]];//Y
+                                          ctx->bufptr_1[index]=new unsigned char[parm.psize[1]];//UV or UU
+                                          ctx->bufptr_2[index]=new unsigned char[parm.psize[2]];//VV
 					}
 				}
 
@@ -283,11 +293,13 @@ void *dec_capture_loop_fcn(void *arg){
 				ctx->frame_linesize[2]=parm.width[2];
 				ctx->frame_size[2]=parm.psize[2];
 
-
-				ret=NvBuffer2Raw(ctx->dst_dma_fd,0,parm.width[0],parm.height[0],ctx->bufptr_0[buf_index]);
-				ret=NvBuffer2Raw(ctx->dst_dma_fd,1,parm.width[1],parm.height[1],ctx->bufptr_1[buf_index]);	
+                                ret=NvBufSurface2Raw(buf_surf, 0, 0, parm.width[0], parm.height[0],ctx->bufptr_0[buf_index]);
+                                TEST_ERROR(ret < 0, "Copy plane0 to mem error", ret);
+                                ret=NvBufSurface2Raw(buf_surf, 0, 1, parm.width[1], parm.height[1],ctx->bufptr_1[buf_index]);
+                                TEST_ERROR(ret < 0, "Copy plane1 to mem error", ret);
 				if(ctx->out_pixfmt==NV_PIX_YUV420)
-					ret=NvBuffer2Raw(ctx->dst_dma_fd,2,parm.width[2],parm.height[2],ctx->bufptr_2[buf_index]);	
+                                        ret=NvBufSurface2Raw(buf_surf, 0, 2, parm.width[2], parm.height[2],ctx->bufptr_2[buf_index]);
+                                        TEST_ERROR(ret < 0, "Copy plane2 to mem error", ret);
 
 				ctx->frame_pools->push(buf_index);
 				ctx->timestamp[buf_index]= (v4l2_buf.timestamp.tv_usec % 1000000) + (v4l2_buf.timestamp.tv_sec * 1000000UL);
@@ -295,7 +307,7 @@ void *dec_capture_loop_fcn(void *arg){
 				buf_index=(buf_index+1)%MAX_BUFFERS;
 
 			}
-			
+
 			ctx->mutex->unlock();
 
 			if (ctx->eos) {
@@ -316,7 +328,6 @@ void *dec_capture_loop_fcn(void *arg){
 }
 
 nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
-	
 	int ret;
 	log_level = LOG_LEVEL_INFO;
 
@@ -393,7 +404,7 @@ nvmpictx* nvmpi_create_decoder(nvCodingType codingType,nvPixFormat pixFormat){
 
 int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 	int ret;
-	
+
 	struct v4l2_buffer v4l2_buf;
 	struct v4l2_plane planes[MAX_PLANES];
 	NvBuffer *nvBuffer;
@@ -452,7 +463,6 @@ int nvmpi_decoder_put_packet(nvmpictx* ctx,nvPacket* packet){
 
 
 int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame,bool wait){
-	
 	int ret,picture_index;
 	std::unique_lock<std::mutex> lock(*ctx->mutex);
 
@@ -468,7 +478,6 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame,bool wait){
 
 	picture_index=ctx->frame_pools->front();
 	ctx->frame_pools->pop();
-
 	frame->width=ctx->coded_width;
 	frame->height=ctx->coded_height;
 
@@ -490,13 +499,12 @@ int nvmpi_decoder_get_frame(nvmpictx* ctx,nvFrame* frame,bool wait){
 }
 
 int nvmpi_decoder_close(nvmpictx* ctx){
-
 	ctx->mutex->lock();
 	ctx->eos=true;
 	ctx->mutex->unlock();
-	
+
 	ctx->dec->capture_plane.setStreamStatus(false);
-	
+
 	if (ctx->dec_capture_loop) {
 		ctx->dec_capture_loop->join();
 		delete ctx->dec_capture_loop;
@@ -505,20 +513,20 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	if(ctx->dst_dma_fd != -1)
 	{
-		NvBufferDestroy(ctx->dst_dma_fd);
+		NvBufSurf::NvDestroy(ctx->dst_dma_fd);
 		ctx->dst_dma_fd = -1;
 	}
 
 	for (int index = 0; index < ctx->numberCaptureBuffers; index++)
 	{
 		if (ctx->dmaBufferFileDescriptor[index] != 0)
-		{	
-			int ret = NvBufferDestroy(ctx->dmaBufferFileDescriptor[index]);
+		{
+			int ret = NvBufSurf::NvDestroy(ctx->dmaBufferFileDescriptor[index]);
 			TEST_ERROR(ret < 0, "Failed to Destroy NvBuffer", ret);
 		}
 
 	}
-	
+
 	delete ctx->dec; ctx->dec = nullptr;
 
 	for(int index=0;index<MAX_BUFFERS;index++){
@@ -535,5 +543,3 @@ int nvmpi_decoder_close(nvmpictx* ctx){
 
 	return 0;
 }
-
-
