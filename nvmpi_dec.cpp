@@ -90,6 +90,7 @@ void respondToResolutionEvent(v4l2_format &format, v4l2_crop &crop,nvmpictx* ctx
 
 
 	ret=ctx->dec->setCapturePlaneFormat(format.fmt.pix_mp.pixelformat,format.fmt.pix_mp.width,format.fmt.pix_mp.height);
+        ret=ctx->dec->setMaxPerfMode(1);
 	TEST_ERROR(ret < 0, "Error in setting decoder capture plane format", ret);
 
 	ctx->dec->getMinimumCapturePlaneBuffers(minimumDecoderCaptureBuffers);
