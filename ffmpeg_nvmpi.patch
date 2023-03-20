@@ -1,5 +1,31 @@
+From 437f8c556b55a9e8722d0100f2aab41ce7bfea10 Mon Sep 17 00:00:00 2001
+From: Bartosz Meglicki <bmegli@op.pl>
+Date: Mon, 20 Mar 2023 17:29:46 +0100
+Subject: [PATCH] POC for new FFmpeg nvmpi API implementation
+
+- implement send_frame, receive_packet FFmpeg API
+- this should allow low latency streaming
+  - previous encode2 API may return 1 packet per frame
+  - new API allows "draining" pending packets while streaming
+
+EOS:
+- current implementation doesn't make sure that all packets are drained from hardware
+- so you might miss some last few packets
+
+Related to:
+- https://github.com/jocover/jetson-ffmpeg/issues/131
+---
+ configure              |  13 ++
+ libavcodec/Makefile    |   8 ++
+ libavcodec/allcodecs.c |   8 ++
+ libavcodec/nvmpi_dec.c | 171 +++++++++++++++++++++++
+ libavcodec/nvmpi_enc.c | 309 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 509 insertions(+)
+ create mode 100644 libavcodec/nvmpi_dec.c
+ create mode 100644 libavcodec/nvmpi_enc.c
+
 diff --git a/configure b/configure
-index 6a7a85c..5810ab5 100755
+index 927857f..70433f4 100755
 --- a/configure
 +++ b/configure
 @@ -340,6 +340,7 @@ External library support:
@@ -361,10 +387,10 @@ index 0000000..f82aa61
 +
 diff --git a/libavcodec/nvmpi_enc.c b/libavcodec/nvmpi_enc.c
 new file mode 100644
-index 0000000..0e1390e
+index 0000000..53fca62
 --- /dev/null
 +++ b/libavcodec/nvmpi_enc.c
-@@ -0,0 +1,272 @@
+@@ -0,0 +1,309 @@
 +#include <nvmpi.h>
 +#include "avcodec.h"
 +#include "internal.h"
@@ -385,6 +411,7 @@ index 0000000..0e1390e
 +	int level;
 +	int rc;
 +	int preset;
++	int encoder_flushing;
 +}nvmpiEncodeContext;
 +
 +static av_cold int nvmpi_encode_init(AVCodecContext *avctx){
@@ -492,13 +519,14 @@ index 0000000..0e1390e
 +	return 0;
 +}
 +
-+
-+static int nvmpi_encode_frame(AVCodecContext *avctx, AVPacket *pkt,const AVFrame *frame, int *got_packet){
-+
++static int ff_nvmpi_send_frame(AVCodecContext *avctx,const AVFrame *frame)
++{
 +	nvmpiEncodeContext * nvmpi_context = avctx->priv_data;
 +	nvFrame _nvframe={0};
-+	nvPacket packet={0};
 +	int res;
++
++	if (nvmpi_context->encoder_flushing)
++		return AVERROR_EOF;
 +
 +	if(frame){
 +
@@ -521,11 +549,24 @@ index 0000000..0e1390e
 +		if(res<0)
 +			return res;
 +	}
++	else
++		nvmpi_context->encoder_flushing = 1;
 +
++	return 0;
++}
++
++static int ff_nvmpi_receive_packet(AVCodecContext *avctx, AVPacket *pkt)
++{
++	nvmpiEncodeContext * nvmpi_context = avctx->priv_data;
++	nvPacket packet={0};
 +
 +	if(nvmpi_encoder_get_packet(nvmpi_context->ctx,&packet)<0)
-+		return 0;
++	{
++		if (nvmpi_context->encoder_flushing)
++			return AVERROR_EOF; //we don't really wait so we may miss some last packets
 +
++		return AVERROR(EAGAIN); //nvmpi get_packet returns -1 if no packets are pending
++	}
 +
 +	ff_alloc_packet2(avctx,pkt,packet.payload_size,packet.payload_size);
 +
@@ -535,6 +576,26 @@ index 0000000..0e1390e
 +	if(packet.flags& AV_PKT_FLAG_KEY)
 +		pkt->flags = AV_PKT_FLAG_KEY;
 +
++	return 0;
++}
++
++static int ff_nvmpi_encode_frame(AVCodecContext *avctx, AVPacket *pkt,const AVFrame *frame, int *got_packet)
++{
++	int res;
++	*got_packet = 0;
++
++	res = ff_nvmpi_send_frame(avctx, frame);
++
++	if(res < 0)
++		return res;
++
++	res = ff_nvmpi_receive_packet(avctx, pkt);
++
++	if (res == AVERROR(EAGAIN) || res == AVERROR_EOF)
++		return 0;
++
++	if (res < 0)
++		return res;
 +
 +	*got_packet = 1;
 +
@@ -627,7 +688,9 @@ index 0000000..0e1390e
 +		.priv_data_size = sizeof(nvmpiEncodeContext), \
 +		.priv_class     = &nvmpi_ ## NAME ##_enc_class, \
 +		.init           = nvmpi_encode_init, \
-+		.encode2        = nvmpi_encode_frame, \
++		.send_frame     = ff_nvmpi_send_frame, \
++		.receive_packet = ff_nvmpi_receive_packet, \
++		.encode2        = ff_nvmpi_encode_frame, \
 +		.close          = nvmpi_encode_close, \
 +		.pix_fmts       = (const enum AVPixelFormat[]) { AV_PIX_FMT_YUV420P, AV_PIX_FMT_NONE },\
 +		.capabilities   = AV_CODEC_CAP_HARDWARE | AV_CODEC_CAP_DELAY, \
@@ -637,3 +700,6 @@ index 0000000..0e1390e
 +
 +NVMPI_ENC(h264, "H.264", AV_CODEC_ID_H264);
 +NVMPI_ENC(hevc, "HEVC", AV_CODEC_ID_HEVC);
+-- 
+2.25.1
+
